@@ -1,9 +1,6 @@
 package com.example.demo.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.Version;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -50,6 +47,7 @@ public class Tenant {
     /**
      * 创建时间 DATETIME(3)
      */
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
     /**
@@ -60,6 +58,7 @@ public class Tenant {
     /**
      * 更新时间 DATETIME(3)
      */
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 
     /**
@@ -71,5 +70,6 @@ public class Tenant {
      * 乐观锁版本号
      */
     @Version
+    @TableField(value = "version", fill = FieldFill.INSERT)
     private Integer version;
 }

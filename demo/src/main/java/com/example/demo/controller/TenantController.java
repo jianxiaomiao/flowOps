@@ -2,13 +2,17 @@ package com.example.demo.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.demo.common.Result;
+import com.example.demo.converter.TenantConverter;
+import com.example.demo.dto.TenantCreateRequest;
+import com.example.demo.dto.TenantUpdateRequest;
 import com.example.demo.entity.Tenant;
 import com.example.demo.service.TenantService;
+import com.example.demo.vo.TenantResponse;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/tenant")
@@ -18,24 +22,29 @@ public class TenantController {
 
     /**
      * 新增租户
-     * @param tenant
-     * @return
+     * DTO 只接收客户端允许填写的字段；状态和审计字段由后端设置。
      */
     @PostMapping
-    public Result<Long> save(@RequestBody Tenant tenant) {
+    public Result<TenantResponse> save(@RequestBody TenantCreateRequest request) {
+        Tenant tenant = TenantConverter.toEntity(request);
+        tenant.setStatus("ACTIVE");
         tenantService.save(tenant);
-        return Result.success(tenant.getId());
+        return Result.success(TenantConverter.toResponse(tenant));
     }
 
     /**
      * 修改租户
-     * @param tenant
-     * @return
+     * tenantCode 和 status 不在本接口中修改，避免普通资料修改影响租户身份或启停状态。
      */
     @PutMapping
-    public Result<Long> update(@RequestBody Tenant tenant){
+    public Result<TenantResponse> update(@RequestBody TenantUpdateRequest request){
+        Tenant tenant = tenantService.getById(request.getId());
+        if (tenant == null) {
+            return Result.failure(20001, "租户不存在");
+        }
+        TenantConverter.copyToEntity(request, tenant);
         tenantService.updateById(tenant);
-        return Result.success(tenant.getId());
+        return Result.success(TenantConverter.toResponse(tenant));
     }
 
     /**
@@ -44,8 +53,12 @@ public class TenantController {
      * @return
      */
     @GetMapping("/{id}")
-    public Result<Tenant> getOne(@PathVariable Long id){
-        return  Result.success(tenantService.getById(id));
+    public Result<TenantResponse> getOne(@PathVariable Long id){
+        Tenant tenant = tenantService.getById(id);
+        if (tenant == null) {
+            return Result.failure(20001, "租户不存在");
+        }
+        return Result.success(TenantConverter.toResponse(tenant));
     }
 
     /**
@@ -53,8 +66,11 @@ public class TenantController {
      * @return
      */
     @GetMapping
-    public Result<List<Tenant>> list() {
-        return Result.success(tenantService.list());
+    public Result<List<TenantResponse>> list() {
+        List<TenantResponse> responseList = tenantService.list().stream()
+                .map(TenantConverter::toResponse)
+                .toList();
+        return Result.success(responseList);
     }
 
     /**
@@ -64,10 +80,10 @@ public class TenantController {
      * @return
      */
     @GetMapping("/page")
-    public Result<Page<Tenant>> findPage(@RequestParam(defaultValue = "1") Integer pageNum, @RequestParam(defaultValue = "10") Integer pageSize){
-        return Result.success(
-                tenantService.page(new Page<>(pageNum, pageSize))
-        );
+    public Result<Page<TenantResponse>> findPage(@RequestParam(defaultValue = "1") Integer pageNum, @RequestParam(defaultValue = "10") Integer pageSize){
+        Page<Tenant> tenantPage = tenantService.page(new Page<>(pageNum, pageSize));
+        Page<TenantResponse> responsePage = (Page<TenantResponse>) tenantPage.convert(TenantConverter::toResponse);
+        return Result.success(responsePage);
     }
 
     /**
