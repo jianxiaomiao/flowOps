@@ -1,0 +1,8 @@
+spring:
+  profiles:
+    default: local
+
+server:
+  servlet:
+    context-path: /flowOps
+  port: 8080

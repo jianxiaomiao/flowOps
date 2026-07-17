@@ -1,0 +1,12 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/flowops_dev?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${FLOWOPS_DB_USERNAME}
+    password: ${FLOWOPS_DB_PASSWORD}
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml

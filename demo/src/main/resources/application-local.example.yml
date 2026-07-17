@@ -1,0 +1,11 @@
+# Copy this file to application-local.yml and replace the placeholder values.
+# application-local.yml is intentionally excluded from Git.
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/flowops_dev?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: your_database_username
+    password: your_database_password
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml

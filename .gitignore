@@ -1,0 +1,12 @@
+# IntelliJ IDEA
+.idea/
+**/.idea/
+*.iml
+*.ipr
+*.iws
+
+# Build output
+**/target/
+
+# Local secrets: keep the template in Git, never commit actual credentials.
+/demo/src/main/resources/application-local.yml
