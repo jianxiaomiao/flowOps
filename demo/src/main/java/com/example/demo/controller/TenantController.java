@@ -1,17 +1,20 @@
 package com.example.demo.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.demo.common.Result;
 import com.example.demo.converter.TenantConverter;
-import com.example.demo.dto.TenantCreateRequest;
-import com.example.demo.dto.TenantUpdateRequest;
+import com.example.demo.dto.tenant.TenantCreateRequest;
+import com.example.demo.dto.tenant.TenantPageQuery;
+import com.example.demo.dto.tenant.TenantUpdateRequest;
 import com.example.demo.entity.Tenant;
 import com.example.demo.service.TenantService;
 import com.example.demo.vo.TenantResponse;
 import jakarta.annotation.Resource;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -73,17 +76,24 @@ public class TenantController {
         return Result.success(responseList);
     }
 
-    /**
-     * 分页获取租户
-     * @param pageNum
-     * @param pageSize
-     * @return
-     */
+
     @GetMapping("/page")
-    public Result<Page<TenantResponse>> findPage(@RequestParam(defaultValue = "1") Integer pageNum, @RequestParam(defaultValue = "10") Integer pageSize){
-        Page<Tenant> tenantPage = tenantService.page(new Page<>(pageNum, pageSize));
-        Page<TenantResponse> responsePage = (Page<TenantResponse>) tenantPage.convert(TenantConverter::toResponse);
-        return Result.success(responsePage);
+    public Result<Page<TenantResponse>> findPage(@ModelAttribute TenantPageQuery query){
+        LambdaQueryWrapper<Tenant> wrapper = Wrappers.lambdaQuery(Tenant.class)
+                .eq(StringUtils.hasText(query.getTenantCode()),
+                        Tenant::getTenantCode, query.getTenantCode())
+                .like(StringUtils.hasText(query.getTenantName()),
+                        Tenant::getTenantName, query.getTenantName())
+                .eq(StringUtils.hasText(query.getStatus()),
+                        Tenant::getStatus, query.getStatus())
+                .orderByDesc(Tenant::getCreatedAt);
+        Page<Tenant> tenantPage = tenantService.page(
+                new Page<>(query.getPageNum(), query.getPageSize()),
+                wrapper
+        );
+        Page<TenantResponse> responsePage =
+                (Page<TenantResponse>) tenantPage.convert(TenantConverter::toResponse);
+        return  Result.success(responsePage);
     }
 
     /**

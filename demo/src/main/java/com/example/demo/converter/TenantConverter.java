@@ -1,7 +1,7 @@
 package com.example.demo.converter;
 
-import com.example.demo.dto.TenantCreateRequest;
-import com.example.demo.dto.TenantUpdateRequest;
+import com.example.demo.dto.tenant.TenantCreateRequest;
+import com.example.demo.dto.tenant.TenantUpdateRequest;
 import com.example.demo.entity.Tenant;
 import com.example.demo.vo.TenantResponse;
 
