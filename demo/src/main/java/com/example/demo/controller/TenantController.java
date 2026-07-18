@@ -102,7 +102,7 @@ public class TenantController {
      * @return
      */
     @DeleteMapping("/{id}")
-    public Result<Void> delete(@PathVariable Long id){
+    public Result<Void> disable(@PathVariable Long id){
         boolean updated = tenantService.lambdaUpdate()
                 .eq(Tenant::getId, id)
                 .set(Tenant::getStatus, "DISABLED")

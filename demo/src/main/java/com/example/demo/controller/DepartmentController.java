@@ -130,7 +130,7 @@ public class DepartmentController {
      * @return
      */
     @DeleteMapping("/{id}")
-    public Result<Void> delete(@PathVariable Long id){
+    public Result<Void> disable(@PathVariable Long id){
         boolean updated = departmentService.lambdaUpdate()
                 .eq(Department::getId, id)
                 .set(Department::getStatus, "DISABLED")

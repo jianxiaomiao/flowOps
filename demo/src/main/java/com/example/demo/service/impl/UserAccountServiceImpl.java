@@ -8,13 +8,10 @@ import com.example.demo.converter.UserAccountConverter;
 import com.example.demo.dto.user.UserAccountCreateRequest;
 import com.example.demo.dto.user.UserAccountPageQuery;
 import com.example.demo.dto.user.UserAccountUpdateRequest;
-import com.example.demo.entity.Department;
-import com.example.demo.entity.Tenant;
 import com.example.demo.entity.UserAccount;
 import com.example.demo.mapper.UserAccountMapper;
-import com.example.demo.service.DepartmentService;
-import com.example.demo.service.TenantService;
 import com.example.demo.service.UserAccountService;
+import com.example.demo.validator.TenantScopeValidator;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,17 +30,14 @@ public class UserAccountServiceImpl
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_DISABLED = "DISABLED";
 
-    private final TenantService tenantService;
-    private final DepartmentService departmentService;
+    private final TenantScopeValidator tenantScopeValidator;
     private final PasswordEncoder passwordEncoder;
 
     public UserAccountServiceImpl(
-            TenantService tenantService,
-            DepartmentService departmentService,
+            TenantScopeValidator tenantScopeValidator,
             PasswordEncoder passwordEncoder
     ) {
-        this.tenantService = tenantService;
-        this.departmentService = departmentService;
+        this.tenantScopeValidator = tenantScopeValidator;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -55,8 +49,8 @@ public class UserAccountServiceImpl
         String username = normalizeUsername(request.getUsername());
         validateRawPassword(request.getRawPassword());
 
-        validateActiveTenant(tenantId);
-        validateActiveDepartment(tenantId, departmentId);
+        tenantScopeValidator.requireActiveTenant(tenantId);
+        tenantScopeValidator.requireActiveDepartment(tenantId, departmentId);
 
         boolean usernameExists = lambdaQuery()
                 .eq(UserAccount::getTenantId, tenantId)
@@ -85,7 +79,7 @@ public class UserAccountServiceImpl
         Long departmentId = requirePositiveId(request.getDepartmentId(), "departmentId");
         UserAccount userAccount = getUser(checkedTenantId, request.getId());
 
-        validateActiveDepartment(checkedTenantId, departmentId);
+        tenantScopeValidator.requireActiveDepartment(checkedTenantId, departmentId);
         UserAccountConverter.copyToEntity(request, userAccount);
 
         if (!updateById(userAccount)) {
@@ -140,27 +134,6 @@ public class UserAccountServiceImpl
         userAccount.setStatus(STATUS_DISABLED);
         if (!updateById(userAccount)) {
             throw new BusinessException(30002, "用户数据已被其他操作修改，请刷新后重试");
-        }
-    }
-
-    private void validateActiveTenant(Long tenantId) {
-        boolean exists = tenantService.lambdaQuery()
-                .eq(Tenant::getId, tenantId)
-                .eq(Tenant::getStatus, STATUS_ACTIVE)
-                .exists();
-        if (!exists) {
-            throw new BusinessException(20001, "租户不存在或已停用");
-        }
-    }
-
-    private void validateActiveDepartment(Long tenantId, Long departmentId) {
-        boolean exists = departmentService.lambdaQuery()
-                .eq(Department::getId, departmentId)
-                .eq(Department::getTenantId, tenantId)
-                .eq(Department::getStatus, STATUS_ACTIVE)
-                .exists();
-        if (!exists) {
-            throw new BusinessException(20001, "部门不存在、已停用或不属于当前租户");
         }
     }
 
