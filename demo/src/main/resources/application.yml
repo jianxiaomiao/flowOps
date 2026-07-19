@@ -6,3 +6,8 @@ server:
   servlet:
     context-path: /flowOps
   port: 8080
+
+# 默认从 demo 目录启动时写入 flowops/logger；可用环境变量 FLOWOPS_LOG_PATH 覆盖。
+flowops:
+  logging:
+    path: ${FLOWOPS_LOG_PATH:../logger}
