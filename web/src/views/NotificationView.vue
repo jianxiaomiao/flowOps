@@ -10,7 +10,7 @@ const pageNum = ref(1)
 const unreadOnly = ref(false)
 const loading = ref(false)
 async function load() { loading.value = true; try { const page = await fetchNotificationPage(pageNum.value, 10, unreadOnly.value); rows.value = page.records; total.value = page.total } finally { loading.value = false } }
-async function markRead(row: unknown) { const item = row as NotificationItem; await markNotificationRead(item.id); ElMessage.success('已标记为已读'); await load() }
+async function markRead(row: unknown) { const item = row as NotificationItem; await markNotificationRead(item.id); window.dispatchEvent(new Event('flowops:notification-changed')); ElMessage.success('已标记为已读'); await load() }
 onMounted(load)
 </script>
 <template><main class="workspace-page"><header class="page-heading"><div><span class="section-kicker">INBOX</span><h1>消息通知</h1><p>来自 Outbox 与 RabbitMQ 消费链路的站内通知。</p></div><el-switch v-model="unreadOnly" active-text="只看未读" @change="load" /></header>

@@ -11,6 +11,8 @@ import com.example.demo.dto.role.RolePageQuery;
 import com.example.demo.dto.role.RoleUpdateRequest;
 import com.example.demo.entity.Role;
 import com.example.demo.mapper.RoleMapper;
+import com.example.demo.mapper.UserRoleMapper;
+import com.example.demo.security.TokenSessionService;
 import com.example.demo.service.RoleService;
 import com.example.demo.security.TenantContext;
 import com.example.demo.validator.TenantScopeValidator;
@@ -31,10 +33,15 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
 
     private final TenantScopeValidator tenantScopeValidator;
     private final TenantContext tenantContext;
+    private final UserRoleMapper userRoleMapper;
+    private final TokenSessionService tokenSessionService;
 
-    public RoleServiceImpl(TenantScopeValidator tenantScopeValidator, TenantContext tenantContext) {
+    public RoleServiceImpl(TenantScopeValidator tenantScopeValidator, TenantContext tenantContext,
+                           UserRoleMapper userRoleMapper, TokenSessionService tokenSessionService) {
         this.tenantScopeValidator = tenantScopeValidator;
         this.tenantContext = tenantContext;
+        this.userRoleMapper = userRoleMapper;
+        this.tokenSessionService = tokenSessionService;
     }
 
     @Override
@@ -94,6 +101,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         if (!updateById(role)) {
             throw new BusinessException(30002, "角色数据已被其他操作修改，请刷新后重试");
         }
+        tokenSessionService.bumpVersionsAfterCommit(
+                tenantId, userRoleMapper.selectUserIdsByRole(tenantId, request.getId()));
         return role;
     }
 
@@ -154,6 +163,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         if (!updateById(role)) {
             throw new BusinessException(30002, "角色数据已被其他操作修改，请刷新后重试");
         }
+        tokenSessionService.bumpVersionsAfterCommit(
+                tenantId, userRoleMapper.selectUserIdsByRole(tenantId, roleId));
     }
 
     @Override
@@ -171,6 +182,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         if (!updateById(role)) {
             throw new BusinessException(30002, "角色数据已被其他操作修改，请刷新后重试");
         }
+        tokenSessionService.bumpVersionsAfterCommit(
+                tenantId, userRoleMapper.selectUserIdsByRole(tenantId, roleId));
     }
 
     /** @param roleCode 原角色编码。@return 大写且去除空白后的角色编码。@throws BusinessException 当编码为空或格式非法时抛出。 */

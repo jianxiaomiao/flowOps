@@ -10,6 +10,7 @@ import com.example.demo.mapper.RolePermissionMapper;
 import com.example.demo.mapper.TenantMapper;
 import com.example.demo.mapper.UserAccountMapper;
 import com.example.demo.service.AuthService;
+import com.example.demo.security.TokenSessionService;
 import com.example.demo.vo.LoginResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +36,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
     private final JwtProperties jwtProperties;
+    private final TokenSessionService tokenSessionService;
 
     @Override
     @Transactional
@@ -69,6 +72,7 @@ public class AuthServiceImpl implements AuthService {
         List<String> authorities = rolePermissionMapper.selectActivePermissionCodes(tenant.getId(), user.getId());
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plus(jwtProperties.accessTokenTtl());
+        long sessionVersion = tokenSessionService.currentVersion(tenant.getId(), user.getId());
         //.issuer(...)	iss	谁签发了 Token；这里是 FlowOps
         //.issuedAt(...)	iat	何时签发
         //.expiresAt(...)	exp	何时过期
@@ -80,9 +84,11 @@ public class AuthServiceImpl implements AuthService {
                 .issuer(jwtProperties.issuer())
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
+                .id(UUID.randomUUID().toString())
                 .subject(username)
                 .claim("user_id", user.getId())
                 .claim("tenant_id", tenant.getId())
+                .claim("session_version", sessionVersion)
                 .claim("authorities", authorities)
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).type("JWT").build();

@@ -607,15 +607,9 @@ a {
   background: rgba(255, 255, 255, 0.6);
 }
 
-.notification-button > span {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 7px;
-  height: 7px;
-  border: 2px solid #f6faf4;
-  border-radius: 50%;
-  background: #e1a65c;
+.notification-button .el-badge {
+  display: inline-grid;
+  place-items: center;
 }
 
 /* 工单工作台 */

@@ -11,6 +11,10 @@ export async function fetchCurrentUser() {
   return response.data.data
 }
 
+export async function logoutApi() {
+  await http.post<ApiResult<null>>('/auth/logout')
+}
+
 export async function registerTenant(payload: TenantRegistrationRequest) {
   const response = await http.post<ApiResult<TenantRegistrationResponse>>('/auth/register', payload)
   return response.data.data

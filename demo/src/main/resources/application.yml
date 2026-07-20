@@ -1,6 +1,20 @@
 spring:
   profiles:
     default: local
+  data:
+    redis:
+      host: ${FLOWOPS_REDIS_HOST:localhost}
+      port: ${FLOWOPS_REDIS_PORT:6379}
+      password: ${FLOWOPS_REDIS_PASSWORD:}
+      connect-timeout: 2s
+      timeout: 2s
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: true
+    clean-disabled: true
   rabbitmq:
     publisher-confirm-type: correlated
     publisher-returns: true
@@ -22,6 +36,15 @@ server:
 
 # 默认从 demo 目录启动时写入 flowops/logger；可用环境变量 FLOWOPS_LOG_PATH 覆盖。
 flowops:
+  redis:
+    enabled: ${FLOWOPS_REDIS_ENABLED:false}
+    key-prefix: flowops
+    default-ttl: 10m
+    notification-unread-ttl: 30s
+    login-max-failures: 5
+    login-window: 5m
+    registration-max-requests: 3
+    registration-window: 1h
   logging:
     path: ${FLOWOPS_LOG_PATH:../logger}
   security:

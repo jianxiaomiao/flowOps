@@ -5,6 +5,7 @@ import com.example.demo.common.Result;
 import com.example.demo.dto.notification.NotificationPageQuery;
 import com.example.demo.entity.Notification;
 import com.example.demo.service.NotificationService;
+import com.example.demo.vo.UnreadNotificationCountResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,12 @@ public class NotificationController {
     @GetMapping("/page")
     public Result<Page<Notification>> page(@Valid @ModelAttribute NotificationPageQuery query) {
         return Result.success(notificationService.pageInbox(query));
+    }
+
+    /** 高频顶部角标接口；优先从 Redis 返回，缓存未命中时回源数据库。 */
+    @GetMapping("/unread-count")
+    public Result<UnreadNotificationCountResponse> unreadCount() {
+        return Result.success(new UnreadNotificationCountResponse(notificationService.unreadCount()));
     }
 
     /** @param id 要标记为已读的通知 ID。@return 空的成功响应。 */

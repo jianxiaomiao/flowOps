@@ -7,5 +7,6 @@ import com.example.demo.entity.Notification;
 
 public interface NotificationService extends IService<Notification> {
     Page<Notification> pageInbox(NotificationPageQuery query);
+    long unreadCount();
     void markRead(Long notificationId);
 }

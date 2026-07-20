@@ -1,17 +1,22 @@
 package com.example.demo.controller;
 
+import com.example.demo.common.BusinessException;
 import com.example.demo.common.Result;
 import com.example.demo.dto.auth.LoginRequest;
 import com.example.demo.dto.auth.TenantRegistrationRequest;
+import com.example.demo.security.AuthenticationRateLimiter;
 import com.example.demo.security.CurrentUser;
 import com.example.demo.security.CurrentUserProvider;
+import com.example.demo.security.TokenSessionService;
 import com.example.demo.service.AuthService;
 import com.example.demo.service.OnboardingService;
 import com.example.demo.vo.CurrentUserResponse;
 import com.example.demo.vo.LoginResponse;
 import com.example.demo.vo.TenantRegistrationResponse;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,6 +29,8 @@ public class AuthController {
     private final AuthService authService;
     private final CurrentUserProvider currentUserProvider;
     private final OnboardingService onboardingService;
+    private final AuthenticationRateLimiter authenticationRateLimiter;
+    private final TokenSessionService tokenSessionService;
 
     /**
      * 使用租户编码、用户名和密码创建 JWT。
@@ -32,14 +39,35 @@ public class AuthController {
      * @return 含访问令牌、令牌类型和过期时间的统一成功响应。
      */
     @PostMapping("/login")
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return Result.success(authService.login(request));
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                       HttpServletRequest servletRequest) {
+        String clientIp = servletRequest.getRemoteAddr();
+        authenticationRateLimiter.assertLoginAllowed(request, clientIp);
+        try {
+            LoginResponse response = authService.login(request);
+            authenticationRateLimiter.resetLoginAccount(request);
+            return Result.success(response);
+        } catch (BusinessException exception) {
+            if (exception.getCode() == 10002) {
+                authenticationRateLimiter.recordLoginFailure(request, clientIp);
+            }
+            throw exception;
+        }
     }
 
     /** 创建新企业、默认部门和首位管理员。 */
     @PostMapping("/register")
-    public Result<TenantRegistrationResponse> register(@Valid @RequestBody TenantRegistrationRequest request) {
+    public Result<TenantRegistrationResponse> register(@Valid @RequestBody TenantRegistrationRequest request,
+                                                        HttpServletRequest servletRequest) {
+        authenticationRateLimiter.consumeRegistration(servletRequest.getRemoteAddr());
         return Result.success(onboardingService.registerTenant(request));
+    }
+
+    /** 撤销当前 JWT；前端仍应同时清除本地 Token。 */
+    @PostMapping("/logout")
+    public Result<Void> logout(JwtAuthenticationToken authentication) {
+        tokenSessionService.revoke(authentication.getToken());
+        return Result.success();
     }
 
     /**

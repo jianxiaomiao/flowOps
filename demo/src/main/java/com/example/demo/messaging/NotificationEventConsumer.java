@@ -4,6 +4,7 @@ import com.example.demo.entity.Notification;
 import com.example.demo.entity.ProcessedEvent;
 import com.example.demo.mapper.NotificationMapper;
 import com.example.demo.mapper.ProcessedEventMapper;
+import com.example.demo.notification.NotificationUnreadCounter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class NotificationEventConsumer {
     private final ProcessedEventMapper processedEventMapper;
     private final NotificationMapper notificationMapper;
     private final ObjectMapper objectMapper;
+    private final NotificationUnreadCounter unreadCounter;
 
     @Transactional
     @RabbitListener(queues = RabbitTopology.NOTIFICATION_QUEUE)
@@ -47,6 +51,7 @@ public class NotificationEventConsumer {
         }
 
         JsonNode payload = event.path("payload");
+        Set<Long> changedRecipients = new HashSet<>();
         for (JsonNode recipient : payload.path("recipientIds")) {
             Notification notification = new Notification();
             notification.setTenantId(processed.getTenantId());
@@ -58,6 +63,10 @@ public class NotificationEventConsumer {
             notification.setBusinessId(event.path("aggregateId").longValue());
             notification.setSourceEventId(processed.getEventId());
             notificationMapper.insert(notification);
+            changedRecipients.add(notification.getRecipientId());
+        }
+        for (Long recipientId : changedRecipients) {
+            unreadCounter.invalidateAfterCommit(processed.getTenantId(), recipientId);
         }
     }
 

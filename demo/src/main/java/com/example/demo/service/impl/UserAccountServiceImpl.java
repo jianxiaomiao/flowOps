@@ -13,6 +13,7 @@ import com.example.demo.entity.UserAccount;
 import com.example.demo.mapper.UserAccountMapper;
 import com.example.demo.service.UserAccountService;
 import com.example.demo.security.TenantContext;
+import com.example.demo.security.TokenSessionService;
 import com.example.demo.validator.TenantScopeValidator;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -37,15 +38,18 @@ public class UserAccountServiceImpl
     private final TenantScopeValidator tenantScopeValidator;
     private final PasswordEncoder passwordEncoder;
     private final TenantContext tenantContext;
+    private final TokenSessionService tokenSessionService;
 
     public UserAccountServiceImpl(
             TenantScopeValidator tenantScopeValidator,
             PasswordEncoder passwordEncoder,
-            TenantContext tenantContext
+            TenantContext tenantContext,
+            TokenSessionService tokenSessionService
     ) {
         this.tenantScopeValidator = tenantScopeValidator;
         this.passwordEncoder = passwordEncoder;
         this.tenantContext = tenantContext;
+        this.tokenSessionService = tokenSessionService;
     }
 
     @Override
@@ -112,6 +116,7 @@ public class UserAccountServiceImpl
         if (!updateById(userAccount)) {
             throw new BusinessException(30002, "用户数据已被其他操作修改，请刷新后重试");
         }
+        tokenSessionService.bumpVersionAfterCommit(tenantId, userAccount.getId());
         return userAccount;
     }
 
@@ -172,6 +177,7 @@ public class UserAccountServiceImpl
         if (!updateById(userAccount)) {
             throw new BusinessException(30002, "用户数据已被其他操作修改，请刷新后重试");
         }
+        tokenSessionService.bumpVersionAfterCommit(tenantId, userId);
     }
 
     @Override
@@ -189,6 +195,7 @@ public class UserAccountServiceImpl
         if (!updateById(userAccount)) {
             throw new BusinessException(30002, "用户数据已被其他操作修改，请刷新后重试");
         }
+        tokenSessionService.bumpVersionAfterCommit(tenantId, userId);
     }
 
     /** @param username 原用户名。@return 去除首尾空格且转小写的用户名。@throws BusinessException 当用户名为空时抛出。 */

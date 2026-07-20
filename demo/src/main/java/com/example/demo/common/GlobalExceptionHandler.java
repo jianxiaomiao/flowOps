@@ -76,6 +76,9 @@ public class GlobalExceptionHandler {
         if (code == 10003) {
             return HttpStatus.FORBIDDEN;
         }
+        if (code == 10004) {
+            return HttpStatus.TOO_MANY_REQUESTS;
+        }
         if (code >= 30000 && code < 40000) {
             return HttpStatus.CONFLICT;
         }

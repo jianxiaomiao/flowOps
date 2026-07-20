@@ -7,6 +7,8 @@ import com.example.demo.entity.Role;
 import com.example.demo.entity.Permission;
 import com.example.demo.entity.RolePermission;
 import com.example.demo.mapper.RolePermissionMapper;
+import com.example.demo.mapper.UserRoleMapper;
+import com.example.demo.security.TokenSessionService;
 import com.example.demo.service.PermissionService;
 import com.example.demo.service.RolePermissionService;
 import com.example.demo.service.RoleService;
@@ -27,12 +29,18 @@ public class RolePermissionServiceImpl extends ServiceImpl<RolePermissionMapper,
     private final RoleService roleService;
     private final PermissionService permissionService;
     private final TenantContext tenantContext;
+    private final UserRoleMapper userRoleMapper;
+    private final TokenSessionService tokenSessionService;
 
-    public RolePermissionServiceImpl(TenantScopeValidator tenantScopeValidator, RoleService roleService, PermissionService permissionService, TenantContext tenantContext) {
+    public RolePermissionServiceImpl(TenantScopeValidator tenantScopeValidator, RoleService roleService,
+                                     PermissionService permissionService, TenantContext tenantContext,
+                                     UserRoleMapper userRoleMapper, TokenSessionService tokenSessionService) {
         this.tenantScopeValidator = tenantScopeValidator;
         this.roleService = roleService;
         this.permissionService = permissionService;
         this.tenantContext = tenantContext;
+        this.userRoleMapper = userRoleMapper;
+        this.tokenSessionService = tokenSessionService;
     }
 
     @Override
@@ -65,6 +73,8 @@ public class RolePermissionServiceImpl extends ServiceImpl<RolePermissionMapper,
         relation.setTenantId(tenantId); relation.setRoleId(roleId); relation.setPermissionId(permissionId);
         relation.setGrantedBy(operatorId); relation.setGrantedAt(LocalDateTime.now());
         if (!save(relation)) throw new IllegalStateException("授予角色权限失败");
+        tokenSessionService.bumpVersionsAfterCommit(
+                tenantId, userRoleMapper.selectUserIdsByRole(tenantId, roleId));
         return relation;
     }
 
@@ -77,6 +87,8 @@ public class RolePermissionServiceImpl extends ServiceImpl<RolePermissionMapper,
                 .eq(RolePermission::getRoleId, requirePositive(roleId, "roleId"))
                 .eq(RolePermission::getPermissionId, requirePositive(permissionId, "permissionId")).remove();
         if (!removed) throw new BusinessException(20001, "角色未拥有该权限");
+        tokenSessionService.bumpVersionsAfterCommit(
+                tenantId, userRoleMapper.selectUserIdsByRole(tenantId, roleId));
     }
 
     @Override

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { fetchCurrentUser, loginApi } from '@/services/auth'
+import { fetchCurrentUser, loginApi, logoutApi } from '@/services/auth'
 import { ACCESS_TOKEN_KEY, EXPIRES_AT_KEY, TENANT_CODE_KEY, USERNAME_KEY } from '@/constants/auth'
 import type { LoginRequest } from '@/types/api'
 
@@ -73,6 +73,14 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.removeItem(TENANT_CODE_KEY)
   }
 
+  async function logoutFromServer() {
+    try {
+      if (accessToken.value) await logoutApi()
+    } finally {
+      logout()
+    }
+  }
+
   return {
     accessToken,
     expiresAt,
@@ -87,5 +95,6 @@ export const useAuthStore = defineStore('auth', () => {
     loadCurrentUser,
     login,
     logout,
+    logoutFromServer,
   }
 })

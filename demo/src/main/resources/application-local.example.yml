@@ -13,11 +13,21 @@ spring:
     password: ${FLOWOPS_RABBITMQ_PASSWORD:}
     virtual-host: ${FLOWOPS_RABBITMQ_VHOST:flowops}
     connection-timeout: 5s
+  data:
+    redis:
+      host: ${FLOWOPS_REDIS_HOST:localhost}
+      port: ${FLOWOPS_REDIS_PORT:6379}
+      password: ${FLOWOPS_REDIS_PASSWORD:}
+      connect-timeout: 2s
+      timeout: 2s
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
 
 flowops:
+  redis:
+    # 本机 Redis 启动后改为 true；多实例部署必须启用。
+    enabled: ${FLOWOPS_REDIS_ENABLED:false}
   registration:
     enabled: ${FLOWOPS_REGISTRATION_ENABLED:true}
   security:

@@ -11,6 +11,7 @@ import com.example.demo.service.RoleService;
 import com.example.demo.service.UserAccountService;
 import com.example.demo.service.UserRoleService;
 import com.example.demo.security.TenantContext;
+import com.example.demo.security.TokenSessionService;
 import com.example.demo.validator.TenantScopeValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,12 +28,16 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     private final UserAccountService userAccountService;
     private final RoleService roleService;
     private final TenantContext tenantContext;
+    private final TokenSessionService tokenSessionService;
 
-    public UserRoleServiceImpl(TenantScopeValidator tenantScopeValidator, UserAccountService userAccountService, RoleService roleService, TenantContext tenantContext) {
+    public UserRoleServiceImpl(TenantScopeValidator tenantScopeValidator, UserAccountService userAccountService,
+                               RoleService roleService, TenantContext tenantContext,
+                               TokenSessionService tokenSessionService) {
         this.tenantScopeValidator = tenantScopeValidator;
         this.userAccountService = userAccountService;
         this.roleService = roleService;
         this.tenantContext = tenantContext;
+        this.tokenSessionService = tokenSessionService;
     }
 
     @Override
@@ -64,6 +69,7 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         relation.setTenantId(tenantId); relation.setUserId(userId); relation.setRoleId(roleId);
         relation.setAssignedBy(operatorId); relation.setAssignedAt(LocalDateTime.now());
         if (!save(relation)) throw new IllegalStateException("授予用户角色失败");
+        tokenSessionService.bumpVersionAfterCommit(tenantId, userId);
         return relation;
     }
 
@@ -76,6 +82,7 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
                 .eq(UserRole::getUserId, requirePositive(userId, "userId"))
                 .eq(UserRole::getRoleId, requirePositive(roleId, "roleId")).remove();
         if (!removed) throw new BusinessException(20001, "用户未拥有该角色");
+        tokenSessionService.bumpVersionAfterCommit(tenantId, userId);
     }
 
     @Override

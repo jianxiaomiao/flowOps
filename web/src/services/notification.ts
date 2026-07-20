@@ -11,3 +11,8 @@ export async function fetchNotificationPage(pageNum = 1, pageSize = 10, unreadOn
 export async function markNotificationRead(id: number) {
   await http.put<ApiResult<null>>(`/notification/${id}/read`)
 }
+
+export async function fetchUnreadNotificationCount() {
+  const response = await http.get<ApiResult<{ unreadCount: number }>>('/notification/unread-count')
+  return response.data.data.unreadCount
+}

@@ -2,6 +2,7 @@ package com.example.demo.config;
 
 import com.example.demo.security.ApiAccessDeniedHandler;
 import com.example.demo.security.ApiAuthenticationEntryPoint;
+import com.example.demo.security.TokenSessionValidator;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -23,7 +24,7 @@ import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties({JwtProperties.class, RegistrationProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, RegistrationProperties.class, FlowOpsRedisProperties.class})
 /**
  * 配置 FlowOps 的无状态 JWT 安全机制。
  *
@@ -123,12 +124,15 @@ public class SecurityConfig {
      * @return 已配置签名算法和校验器的 JWT 解码器。
      */
     @Bean
-    JwtDecoder jwtDecoder(SecretKey secretKey, JwtProperties properties) {
+    JwtDecoder jwtDecoder(SecretKey secretKey,
+                          JwtProperties properties,
+                          TokenSessionValidator tokenSessionValidator) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
         OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(properties.issuer()));
+                JwtValidators.createDefaultWithIssuer(properties.issuer()),
+                tokenSessionValidator);
         decoder.setJwtValidator(validator);
         return decoder;
     }

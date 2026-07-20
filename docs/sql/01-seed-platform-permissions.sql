@@ -1,6 +1,6 @@
 -- FlowOps 平台权限初始化数据。
--- 当前尚未接入 Flyway：请在 Navicat 对 flowops_dev 执行一次。
--- 接入 Flyway 后，应迁移到 src/main/resources/db/migration/ 中统一执行。
+-- 正式初始化已由 db/migration/V2__seed_platform_permissions.sql 管理。
+-- 本文件仅保留为人工排障参考，不应替代 Flyway 执行。
 
 INSERT INTO permission
     (permission_code, permission_name, resource, action, scope, description, status, created_at, updated_at)
