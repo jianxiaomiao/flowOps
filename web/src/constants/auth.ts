@@ -1,0 +1,5 @@
+export const ACCESS_TOKEN_KEY = 'flowops-access-token'
+export const EXPIRES_AT_KEY = 'flowops-expires-at'
+export const LAST_TRACE_ID_KEY = 'flowops-last-trace-id'
+export const USERNAME_KEY = 'flowops-username'
+export const TENANT_CODE_KEY = 'flowops-tenant-code'

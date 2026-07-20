@@ -67,4 +67,87 @@ class AuthServiceImplTest {
         assertEquals(10002, error.getCode());
         verifyNoInteractions(userAccountMapper, passwordEncoder, jwtEncoder);
     }
+
+    @Test
+    void shouldRejectUnknownUserWithSameGenericError() {
+        when(tenantMapper.selectOne(any())).thenReturn(activeTenant());
+        when(userAccountMapper.selectOne(any())).thenReturn(null);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service().login(new LoginRequest("ACME", "unknown", "password123")));
+
+        assertEquals(10002, error.getCode());
+        verifyNoInteractions(passwordEncoder, rolePermissionMapper, jwtEncoder);
+    }
+
+    @Test
+    void shouldRejectDisabledUserWithoutCheckingPassword() {
+        UserAccount disabledUser = activeUser();
+        disabledUser.setStatus("DISABLED");
+        when(tenantMapper.selectOne(any())).thenReturn(activeTenant());
+        when(userAccountMapper.selectOne(any())).thenReturn(disabledUser);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service().login(new LoginRequest("ACME", "disabled", "password123")));
+
+        assertEquals(10002, error.getCode());
+        verifyNoInteractions(passwordEncoder, rolePermissionMapper, jwtEncoder);
+        verify(userAccountMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void shouldRejectWrongPasswordWithoutIssuingToken() {
+        when(tenantMapper.selectOne(any())).thenReturn(activeTenant());
+        when(userAccountMapper.selectOne(any())).thenReturn(activeUser());
+        when(passwordEncoder.matches("wrong-password", "hash")).thenReturn(false);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service().login(new LoginRequest("ACME", "xiaomiao", "wrong-password")));
+
+        assertEquals(10002, error.getCode());
+        verifyNoInteractions(rolePermissionMapper, jwtEncoder);
+        verify(userAccountMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void shouldIssueTokenEvenWhenActiveUserHasNoPermissions() {
+        when(tenantMapper.selectOne(any())).thenReturn(activeTenant());
+        when(userAccountMapper.selectOne(any())).thenReturn(activeUser());
+        when(passwordEncoder.matches("password123", "hash")).thenReturn(true);
+        when(rolePermissionMapper.selectActivePermissionCodes(1L, 1L)).thenReturn(List.of());
+        Jwt encoded = Jwt.withTokenValue("signed-token").header("alg", "HS256")
+                .subject("xiaomiao").issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
+        when(jwtEncoder.encode(any())).thenReturn(encoded);
+
+        var response = service().login(new LoginRequest("ACME", "xiaomiao", "password123"));
+
+        assertEquals("signed-token", response.accessToken());
+        ArgumentCaptor<JwtEncoderParameters> captor = ArgumentCaptor.forClass(JwtEncoderParameters.class);
+        verify(jwtEncoder).encode(captor.capture());
+        assertEquals(List.of(), captor.getValue().getClaims().getClaim("authorities"));
+        verify(userAccountMapper).update(isNull(), any());
+    }
+
+    private AuthServiceImpl service() {
+        return new AuthServiceImpl(tenantMapper, userAccountMapper, rolePermissionMapper,
+                passwordEncoder, jwtEncoder, new JwtProperties("flowops", Duration.ofMinutes(30), "unused"));
+    }
+
+    private Tenant activeTenant() {
+        Tenant tenant = new Tenant();
+        tenant.setId(1L);
+        tenant.setTenantCode("ACME");
+        tenant.setStatus("ACTIVE");
+        return tenant;
+    }
+
+    private UserAccount activeUser() {
+        UserAccount user = new UserAccount();
+        user.setId(1L);
+        user.setTenantId(1L);
+        user.setUsername("xiaomiao");
+        user.setStatus("ACTIVE");
+        user.setPasswordHash("hash");
+        return user;
+    }
 }

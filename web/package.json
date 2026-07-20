@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "npm run type-check && vite build",
     "preview": "vite preview",
-    "type-check": "vue-tsc -b"
+    "type-check": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
     "@element-plus/icons-vue": "latest",
@@ -18,8 +18,9 @@
     "vue-router": "latest"
   },
   "devDependencies": {
+    "@types/node": "latest",
     "@vitejs/plugin-vue": "latest",
-    "typescript": "latest",
+    "typescript": "~5.9.3",
     "vite": "latest",
     "vue-tsc": "latest"
   }

@@ -2,7 +2,10 @@ package com.example.demo.controller;
 
 import com.example.demo.common.Result;
 import com.example.demo.dto.auth.LoginRequest;
+import com.example.demo.security.CurrentUser;
+import com.example.demo.security.CurrentUserProvider;
 import com.example.demo.service.AuthService;
+import com.example.demo.vo.CurrentUserResponse;
 import com.example.demo.vo.LoginResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
  */
 public class AuthController {
     private final AuthService authService;
+    private final CurrentUserProvider currentUserProvider;
 
     /**
      * 使用租户编码、用户名和密码创建 JWT。
@@ -26,5 +30,24 @@ public class AuthController {
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return Result.success(authService.login(request));
+    }
+
+    /**
+     * 返回已通过 JWT 验签的当前用户及权限快照。
+     *
+     * <p>用户 ID、租户 ID 和权限均来自安全上下文，不接受客户端传入，
+     * 避免前端伪造身份或跨租户访问。</p>
+     *
+     * @return 当前用户身份和按编码排序的权限列表。
+     */
+    @GetMapping("/me")
+    public Result<CurrentUserResponse> currentUser() {
+        CurrentUser currentUser = currentUserProvider.requireCurrentUser();
+        CurrentUserResponse response = new CurrentUserResponse(
+                currentUser.userId(),
+                currentUser.tenantId(),
+                currentUser.username(),
+                currentUser.authorities().stream().sorted().toList());
+        return Result.success(response);
     }
 }
