@@ -16,9 +16,6 @@ public class UserAccountPageQuery {
     @Max(value = 100, message = "pageSize 不能超过 100")
     private Integer pageSize = 10;
 
-    /** 当前阶段必传；接入认证后由租户上下文提供。 */
-    @NotNull(message = "tenantId 不能为空")
-    private Long tenantId;
     private Long departmentId;
     private String username;
     private String displayName;

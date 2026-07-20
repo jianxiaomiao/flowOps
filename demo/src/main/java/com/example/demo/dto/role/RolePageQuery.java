@@ -16,9 +16,6 @@ public class RolePageQuery {
     @Max(value = 100, message = "pageSize 不能超过 100")
     private Integer pageSize = 10;
 
-    @NotNull(message = "tenantId 不能为空")
-    private Long tenantId;
-
     private String roleCode;
     private String roleName;
     private String status;

@@ -9,10 +9,6 @@ import lombok.Data;
 @Data
 public class RoleCreateRequest {
 
-    /** 当前未接入认证上下文，第一版暂由请求传入。 */
-    @NotNull(message = "tenantId 不能为空")
-    private Long tenantId;
-
     @NotBlank(message = "roleCode 不能为空")
     @Size(max = 64, message = "roleCode 长度不能超过 64")
     private String roleCode;

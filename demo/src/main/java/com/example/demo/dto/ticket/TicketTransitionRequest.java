@@ -8,9 +8,7 @@ import lombok.Data;
 
 @Data
 public class TicketTransitionRequest {
-    @NotNull @Positive private Long tenantId;
     @NotBlank private String action;
-    @NotNull @Positive private Long operatorId;
     @NotNull private Integer version;
     @Size(max = 500) private String remark;
     private String resolution;

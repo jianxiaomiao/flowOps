@@ -10,10 +10,6 @@ import lombok.Data;
 @Data
 public class UserAccountCreateRequest {
 
-    /** 当前未接入登录上下文，第一版暂由请求传入。 */
-    @NotNull(message = "tenantId 不能为空")
-    private Long tenantId;
-
     @NotNull(message = "departmentId 不能为空")
     private Long departmentId;
 

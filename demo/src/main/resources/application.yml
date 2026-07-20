@@ -1,6 +1,19 @@
 spring:
   profiles:
     default: local
+  rabbitmq:
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+          max-interval: 10s
 
 server:
   servlet:
@@ -11,3 +24,14 @@ server:
 flowops:
   logging:
     path: ${FLOWOPS_LOG_PATH:../logger}
+  security:
+    jwt:
+      issuer: flowops
+      access-token-ttl: 30m
+      secret: ${FLOWOPS_JWT_SECRET:}
+  messaging:
+    enabled: ${FLOWOPS_MESSAGING_ENABLED:false}
+    publish-batch-size: 100
+  sla:
+    enabled: ${FLOWOPS_SLA_ENABLED:true}
+    scan-delay: 60s

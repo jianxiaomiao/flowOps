@@ -7,8 +7,6 @@ import lombok.Data;
 
 @Data
 public class TicketCommentCreateRequest {
-    @NotNull @Positive private Long tenantId;
-    @NotNull @Positive private Long authorId;
     @NotBlank private String content;
     @NotBlank private String visibility;
 }

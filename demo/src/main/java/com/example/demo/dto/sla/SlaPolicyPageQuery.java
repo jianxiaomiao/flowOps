@@ -8,8 +8,6 @@ import lombok.Data;
 
 @Data
 public class SlaPolicyPageQuery {
-    @NotNull @Positive
-    private Long tenantId;
     @Min(1)
     private long pageNum = 1;
     @Min(1) @Max(100)

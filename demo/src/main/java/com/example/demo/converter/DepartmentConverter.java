@@ -18,7 +18,6 @@ public final class DepartmentConverter {
     /** 将创建请求转换为待保存的实体。 */
     public static Department toEntity(DepartmentCreateRequest request) {
         Department department = new Department();
-        department.setTenantId(request.getTenantId());
         department.setParentId(request.getParentId());
         department.setDepartmentCode(request.getDepartmentCode());
         department.setDepartmentName(request.getDepartmentName());

@@ -12,38 +12,53 @@ import com.example.demo.dto.department.DepartmentPageQuery;
 import com.example.demo.dto.department.DepartmentUpdateRequest;
 import com.example.demo.entity.Department;
 import com.example.demo.service.DepartmentService;
+import com.example.demo.security.TenantContext;
 import com.example.demo.vo.DepartmentResponse;
 import jakarta.annotation.Resource;
 import org.springframework.util.StringUtils;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/department")
+@PreAuthorize("hasAuthority('user:manage')")
+/**
+ * 当前租户的部门管理接口。
+ *
+ * <p>所有查询与修改均强制附加当前 JWT 中的 tenantId，避免按部门 ID 跨租户访问。</p>
+ */
 public class DepartmentController {
     @Resource
     private DepartmentService departmentService;
+    @Resource
+    private TenantContext tenantContext;
 
     /**
-     * 新增部门
-     * DTO 只接收客户端允许填写的字段；状态和审计字段由后端设置。
+     * 新增一个默认启用的部门。
+     *
+     * @param request 客户端可填写的部门资料；tenantId 和状态由服务端决定。
+     * @return 新建部门。
      */
     @PostMapping
     public Result<DepartmentResponse> save(@RequestBody DepartmentCreateRequest request) {
         Department department = DepartmentConverter.toEntity(request);
+        department.setTenantId(tenantContext.tenantId());
         department.setStatus("ACTIVE");
         departmentService.save(department);
         return Result.success(DepartmentConverter.toResponse(department));
     }
 
     /**
-     * 修改部门
-     * departmentCode 和 status 不在本接口中修改，避免普通资料修改影响部门
+     * 修改部门的可变资料。
+     *
+     * @param request 部门 ID 与允许修改的资料；编码和状态不在此接口修改。
+     * @return 修改后的部门；部门不存在时返回业务码 20001。
      */
     @PutMapping
     public Result<DepartmentResponse> update(@RequestBody DepartmentUpdateRequest request){
-        Department department = departmentService.getById(request.getId());
+        Department department = findCurrentTenantDepartment(request.getId());
         if (department == null) {
             return Result.failure(20001, "部门不存在");
         }
@@ -52,46 +67,39 @@ public class DepartmentController {
         return Result.success(DepartmentConverter.toResponse(department));
     }
 
-    /**
-     * 获取单个部门
-     * @param id
-     * @return
-     */
+    /** @param id 部门 ID。@return 当前租户中的部门详情。 */
     @GetMapping("/{id}")
     public Result<DepartmentResponse> getOne(@PathVariable Long id){
-        Department department = departmentService.getById(id);
+        Department department = findCurrentTenantDepartment(id);
         if (department == null) {
             return Result.failure(20001, "部门不存在");
         }
         return Result.success(DepartmentConverter.toResponse(department));
     }
 
-    /**
-     * 获取全部部门
-     * @return
-     */
+    /** @return 当前租户的全部部门。 */
     @GetMapping
     public Result<List<DepartmentResponse>> list() {
-        List<DepartmentResponse> responseList = departmentService.list().stream()
+        List<DepartmentResponse> responseList = departmentService.lambdaQuery()
+                .eq(Department::getTenantId, tenantContext.tenantId()).list().stream()
                 .map(DepartmentConverter::toResponse)
                 .toList();
         return Result.success(responseList);
     }
 
 
+    /**
+     * 按条件分页查询当前租户部门。
+     *
+     * @param query 父部门、编码、名称、状态和分页条件。
+     * @return 部门分页。
+     */
     @GetMapping("/page")
     public Result<Page<DepartmentResponse>> findPage(
             @ModelAttribute DepartmentPageQuery query) {
 
-        // 当前还没有登录上下文，tenantId 必须由请求参数传入。
-        // 不加这个限制可能会查出所有租户的部门。
-        if (query.getTenantId() == null) {
-            return Result.failure(10001, "tenantId 不能为空");
-        }
-
         LambdaQueryWrapper<Department> wrapper = Wrappers.lambdaQuery(Department.class)
-                // tenantId 必须参与查询，保证当前阶段的租户隔离
-                .eq(Department::getTenantId, query.getTenantId())
+                .eq(Department::getTenantId, tenantContext.tenantId())
 
                 // parentId 可选：传了就查询该父部门的直接子部门
                 .eq(query.getParentId() != null,
@@ -125,16 +133,31 @@ public class DepartmentController {
     }
 
     /**
-     * 软删除租户
-     * @param id
-     * @return
+     * 停用部门而非物理删除，保留历史工单中的部门引用。
+     *
+     * @param id 要停用的部门 ID。
+     * @return 空的成功响应。
      */
     @DeleteMapping("/{id}")
     public Result<Void> disable(@PathVariable Long id){
         boolean updated = departmentService.lambdaUpdate()
+                .eq(Department::getTenantId, tenantContext.tenantId())
                 .eq(Department::getId, id)
                 .set(Department::getStatus, "DISABLED")
                 .update();
         return Result.success();
+    }
+
+    /**
+     * 读取当前租户范围内的一个部门。
+     *
+     * @param id 部门 ID。
+     * @return 部门；不存在或不属于当前租户时返回 {@code null}。
+     */
+    private Department findCurrentTenantDepartment(Long id) {
+        return departmentService.lambdaQuery()
+                .eq(Department::getTenantId, tenantContext.tenantId())
+                .eq(Department::getId, id)
+                .one();
     }
 }

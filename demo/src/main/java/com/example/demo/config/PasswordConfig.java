@@ -13,6 +13,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @Configuration
 public class PasswordConfig {
 
+    /**
+     * 创建项目统一使用的密码摘要器。
+     *
+     * @return BCrypt 实现的密码编码器；它会为每次编码自动生成并保存盐值。
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

@@ -13,7 +13,6 @@ public final class RoleConverter {
 
     public static Role toEntity(RoleCreateRequest request) {
         Role role = new Role();
-        role.setTenantId(request.getTenantId());
         role.setRoleCode(request.getRoleCode());
         role.setRoleName(request.getRoleName());
         role.setDescription(request.getDescription());

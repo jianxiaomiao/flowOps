@@ -14,10 +14,12 @@ public class OperationLogUtil {
 
     private static final Logger OPERATION_LOGGER = LoggerFactory.getLogger("FLOWOPS_OPERATION");
 
+    /** @param operation 方法标识。@param elapsedMs 方法耗时毫秒数。 */
     public void success(String operation, long elapsedMs) {
         OPERATION_LOGGER.info("operation={} result=SUCCESS elapsedMs={}", operation, elapsedMs);
     }
 
+    /** @param operation 方法标识。@param elapsedMs 方法耗时毫秒数。@param throwable 原异常。 */
     public void failure(String operation, long elapsedMs, Throwable throwable) {
         OPERATION_LOGGER.warn(
                 "operation={} result=FAILURE elapsedMs={} errorType={} errorMessage={}",
@@ -28,6 +30,7 @@ public class OperationLogUtil {
         );
     }
 
+    /** @param message 原错误文本。@return 非空且长度受控的错误文本。 */
     private String safeMessage(String message) {
         if (message == null) {
             return "";

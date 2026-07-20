@@ -12,9 +12,6 @@ public class DepartmentPageQuery {
 
     private Integer pageSize = 10;
 
-    /** 当前阶段由请求传入；接入登录后应从租户上下文获取。 */
-    private Long tenantId;
-
     /** 查询指定父部门的直接子部门；为空时不限制层级。 */
     private Long parentId;
 
@@ -38,14 +35,6 @@ public class DepartmentPageQuery {
 
     public void setPageSize(Integer pageSize) {
         this.pageSize = pageSize;
-    }
-
-    public Long getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(Long tenantId) {
-        this.tenantId = tenantId;
     }
 
     public Long getParentId() {

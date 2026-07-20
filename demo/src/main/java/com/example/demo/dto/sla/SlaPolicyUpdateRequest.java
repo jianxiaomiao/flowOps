@@ -18,6 +18,4 @@ public class SlaPolicyUpdateRequest {
     private Boolean enabled;
     @NotNull
     private Integer version;
-    @Positive
-    private Long operatorId;
 }

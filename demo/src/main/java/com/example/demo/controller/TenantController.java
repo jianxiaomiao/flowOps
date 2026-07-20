@@ -13,20 +13,24 @@ import com.example.demo.service.TenantService;
 import com.example.demo.vo.TenantResponse;
 import jakarta.annotation.Resource;
 import org.springframework.util.StringUtils;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/tenant")
+@PreAuthorize("hasAuthority('platform:tenant:manage')")
+/**
+ * 平台级租户管理接口。
+ *
+ * <p>该接口需要平台权限，不属于普通租户管理员可访问的业务范围。</p>
+ */
 public class TenantController {
     @Resource
     private TenantService tenantService;
 
-    /**
-     * 新增租户
-     * DTO 只接收客户端允许填写的字段；状态和审计字段由后端设置。
-     */
+    /** @param request 客户端可填写的租户资料。@return 新建且默认启用的租户。 */
     @PostMapping
     public Result<TenantResponse> save(@RequestBody TenantCreateRequest request) {
         Tenant tenant = TenantConverter.toEntity(request);
@@ -35,10 +39,7 @@ public class TenantController {
         return Result.success(TenantConverter.toResponse(tenant));
     }
 
-    /**
-     * 修改租户
-     * tenantCode 和 status 不在本接口中修改，避免普通资料修改影响租户身份或启停状态。
-     */
+    /** @param request 租户 ID 和允许修改的资料。@return 修改后的租户。 */
     @PutMapping
     public Result<TenantResponse> update(@RequestBody TenantUpdateRequest request){
         Tenant tenant = tenantService.getById(request.getId());
@@ -50,11 +51,7 @@ public class TenantController {
         return Result.success(TenantConverter.toResponse(tenant));
     }
 
-    /**
-     * 获取单个租户
-     * @param id
-     * @return
-     */
+    /** @param id 租户 ID。@return 租户详情。 */
     @GetMapping("/{id}")
     public Result<TenantResponse> getOne(@PathVariable Long id){
         Tenant tenant = tenantService.getById(id);
@@ -64,10 +61,7 @@ public class TenantController {
         return Result.success(TenantConverter.toResponse(tenant));
     }
 
-    /**
-     * 获取全部租户
-     * @return
-     */
+    /** @return 平台可见的全部租户。 */
     @GetMapping
     public Result<List<TenantResponse>> list() {
         List<TenantResponse> responseList = tenantService.list().stream()
@@ -77,6 +71,7 @@ public class TenantController {
     }
 
 
+    /** @param query 分页及租户编码、名称、状态筛选条件。@return 租户分页。 */
     @GetMapping("/page")
     public Result<Page<TenantResponse>> findPage(@ModelAttribute TenantPageQuery query){
         LambdaQueryWrapper<Tenant> wrapper = Wrappers.lambdaQuery(Tenant.class)
@@ -97,9 +92,10 @@ public class TenantController {
     }
 
     /**
-     * 软删除租户
-     * @param id
-     * @return
+     * 停用租户而非物理删除，保留其历史数据。
+     *
+     * @param id 要停用的租户 ID。
+     * @return 空的成功响应。
      */
     @DeleteMapping("/{id}")
     public Result<Void> disable(@PathVariable Long id){

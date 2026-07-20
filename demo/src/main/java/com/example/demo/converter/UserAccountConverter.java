@@ -17,7 +17,6 @@ public final class UserAccountConverter {
 
     public static UserAccount toEntity(UserAccountCreateRequest request) {
         UserAccount userAccount = new UserAccount();
-        userAccount.setTenantId(request.getTenantId());
         userAccount.setDepartmentId(request.getDepartmentId());
         userAccount.setUsername(request.getUsername());
         userAccount.setDisplayName(request.getDisplayName());

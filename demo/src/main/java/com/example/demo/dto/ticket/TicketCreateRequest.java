@@ -8,8 +8,6 @@ import lombok.Data;
 
 @Data
 public class TicketCreateRequest {
-    @NotNull @Positive private Long tenantId;
-    @NotNull @Positive private Long creatorId;
     @NotNull @Positive private Long handlingDepartmentId;
     @NotBlank @Size(max = 200) private String title;
     @NotBlank private String description;

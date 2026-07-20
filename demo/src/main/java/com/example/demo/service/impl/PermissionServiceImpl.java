@@ -11,12 +11,23 @@ import com.example.demo.service.PermissionService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-/** 权限由平台初始化维护，本服务只提供查询和内部校验。 */
+/**
+ * 权限字典查询与内部校验实现。
+ *
+ * <p>权限由平台初始化脚本维护，租户不能任意创建新权限。</p>
+ */
 @Service
 public class PermissionServiceImpl extends ServiceImpl<PermissionMapper, Permission> implements PermissionService {
     private static final String STATUS_ACTIVE = "ACTIVE";
 
     @Override
+    /**
+     * 获取一个启用中的平台权限。
+     *
+     * @param permissionId 权限 ID。
+     * @return 启用状态的权限。
+     * @throws BusinessException 当 ID 非法、权限不存在或已停用时抛出。
+     */
     public Permission getActivePermission(Long permissionId) {
         if (permissionId == null || permissionId <= 0) {
             throw new BusinessException(10001, "permissionId 必须是正整数");
@@ -29,6 +40,7 @@ public class PermissionServiceImpl extends ServiceImpl<PermissionMapper, Permiss
     }
 
     @Override
+    /** @param query 分页及权限筛选条件。@return 权限字典分页。 */
     public Page<Permission> pagePermissions(PermissionPageQuery query) {
         return page(new Page<>(query.getPageNum(), query.getPageSize()),
                 Wrappers.lambdaQuery(Permission.class)

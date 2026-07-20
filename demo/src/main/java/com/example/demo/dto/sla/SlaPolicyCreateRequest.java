@@ -8,8 +8,6 @@ import lombok.Data;
 
 @Data
 public class SlaPolicyCreateRequest {
-    @NotNull @Positive
-    private Long tenantId;
     @NotBlank @Size(max = 100)
     private String policyName;
     @NotBlank
@@ -18,6 +16,4 @@ public class SlaPolicyCreateRequest {
     private Integer responseMinutes;
     @NotNull @Positive
     private Integer resolutionMinutes;
-    @Positive
-    private Long operatorId;
 }

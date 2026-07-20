@@ -23,7 +23,12 @@ public class TenantScopeValidator {
     private final TenantService tenantService;
     private final DepartmentService departmentService;
 
-    /** 确保租户存在且处于启用状态。 */
+    /**
+     * 确保租户存在且处于启用状态。
+     *
+     * @param tenantId 需要校验的租户 ID。
+     * @throws BusinessException 当租户不存在或已停用时抛出。
+     */
     public void requireActiveTenant(Long tenantId) {
         boolean exists = tenantService.lambdaQuery()
                 .eq(Tenant::getId, tenantId)
@@ -34,7 +39,13 @@ public class TenantScopeValidator {
         }
     }
 
-    /** 确保部门存在、启用，并且属于指定租户。 */
+    /**
+     * 确保部门存在、启用，并且属于指定租户。
+     *
+     * @param tenantId 当前可信租户 ID。
+     * @param departmentId 要使用的部门 ID。
+     * @throws BusinessException 当部门不存在、停用或属于其他租户时抛出。
+     */
     public void requireActiveDepartment(Long tenantId, Long departmentId) {
         boolean exists = departmentService.lambdaQuery()
                 .eq(Department::getId, departmentId)

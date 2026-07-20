@@ -29,6 +29,13 @@ public class OperationLogAspect {
             + "execution(public * transition*(..)) || "
             + "execution(public * addComment*(..))"
             + ")")
+    /**
+     * 包裹符合切点的 Service 写操作，记录成功或失败以及耗时。
+     *
+     * @param joinPoint 当前 Service 方法调用。
+     * @return 原业务方法返回值。
+     * @throws Throwable 原方法异常在记录后继续向上抛出。
+     */
     public Object logOperation(ProceedingJoinPoint joinPoint) throws Throwable {
         long startNanos = System.nanoTime();
         String operation = operationName(joinPoint);
@@ -42,11 +49,13 @@ public class OperationLogAspect {
         }
     }
 
+    /** @param joinPoint 方法调用。@return 便于日志检索的“类名.方法名”。 */
     private String operationName(ProceedingJoinPoint joinPoint) {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         return joinPoint.getTarget().getClass().getSimpleName() + "." + signature.getName();
     }
 
+    /** @param startNanos 开始时间的纳秒值。@return 当前已耗费的毫秒数。 */
     private long elapsedMs(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }

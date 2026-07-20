@@ -13,13 +13,24 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 
-/** 用乐观锁取得租户每日递增编号，避免“先查后改”导致的重复工单号。 */
+/**
+ * 用每日序列表生成租户内唯一的工单编号。
+ *
+ * <p>通过数据库唯一约束和乐观锁重试，避免并发创建时出现“先查后改”的重复编号。</p>
+ */
 @Component
 @RequiredArgsConstructor
 public class TicketNumberGenerator {
     private final TicketNumberSequenceMapper sequenceMapper;
 
     @Transactional(propagation = Propagation.MANDATORY)
+    /**
+     * 获取当前租户当天的下一个工单号。
+     *
+     * @param tenantId 租户 ID。
+     * @return 形如 {@code OPS-20260719-0001} 的工单编号。
+     * @throws BusinessException 当多次并发重试仍无法更新序列时抛出。
+     */
     public String nextTicketNo(Long tenantId) {
         LocalDate date = LocalDate.now(ZoneOffset.UTC);
         for (int attempt = 0; attempt < 3; attempt++) {
@@ -43,6 +54,13 @@ public class TicketNumberGenerator {
         throw new BusinessException(30002, "工单编号生成发生并发冲突，请重试");
     }
 
+    /**
+     * 格式化日期和当天顺序号。
+     *
+     * @param date 编号所属日期。
+     * @param value 当天递增值。
+     * @return 标准工单编号。
+     */
     private String format(LocalDate date, int value) {
         return "OPS-" + date.format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + String.format("%04d", value);
     }
