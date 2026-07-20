@@ -8,6 +8,15 @@
 # Build output
 **/target/
 /demo/.m2repo/
+/logger/
+/web/node_modules/
+/web/dist/
+*.tsbuildinfo
+
+# Frontend local environment
+/web/.env.local
+/web/.env.*.local
 
 # Local secrets: keep the template in Git, never commit actual credentials.
+/.env
 /demo/src/main/resources/application-local.yml

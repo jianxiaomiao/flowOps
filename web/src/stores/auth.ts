@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import http from '@/services/http'
+import { fetchCurrentUser, loginApi } from '@/services/auth'
 import { ACCESS_TOKEN_KEY, EXPIRES_AT_KEY, TENANT_CODE_KEY, USERNAME_KEY } from '@/constants/auth'
-import type { ApiResult, CurrentUserResponse, LoginRequest, LoginResponse } from '@/types/api'
+import type { LoginRequest } from '@/types/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(sessionStorage.getItem(ACCESS_TOKEN_KEY) ?? '')
@@ -31,8 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
-      const response = await http.get<ApiResult<CurrentUserResponse>>('/auth/me')
-      const currentUser = response.data.data
+      const currentUser = await fetchCurrentUser()
       userId.value = currentUser.userId
       tenantId.value = currentUser.tenantId
       username.value = currentUser.username
@@ -47,8 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function login(payload: LoginRequest) {
-    const response = await http.post<ApiResult<LoginResponse>>('/auth/login', payload)
-    const loginData = response.data.data
+    const loginData = await loginApi(payload)
     accessToken.value = loginData.accessToken
     expiresAt.value = loginData.expiresAt
     username.value = payload.username

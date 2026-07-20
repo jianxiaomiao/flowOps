@@ -79,4 +79,11 @@ public class RoleController {
         roleService.disableRole(tenantContext.tenantId(), id);
         return Result.success();
     }
+
+    /** @param id 要重新启用的非内置角色 ID。@return 空的成功响应。 */
+    @PutMapping("/{id}/enable")
+    public Result<Void> enable(@PathVariable Long id) {
+        roleService.enableRole(tenantContext.tenantId(), id);
+        return Result.success();
+    }
 }

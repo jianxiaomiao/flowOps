@@ -29,6 +29,8 @@ flowops:
       issuer: flowops
       access-token-ttl: 30m
       secret: ${FLOWOPS_JWT_SECRET:}
+  registration:
+    enabled: ${FLOWOPS_REGISTRATION_ENABLED:true}
   messaging:
     enabled: ${FLOWOPS_MESSAGING_ENABLED:false}
     publish-batch-size: 100

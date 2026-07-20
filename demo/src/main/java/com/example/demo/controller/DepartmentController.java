@@ -14,7 +14,7 @@ import com.example.demo.entity.Department;
 import com.example.demo.service.DepartmentService;
 import com.example.demo.security.TenantContext;
 import com.example.demo.vo.DepartmentResponse;
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -24,16 +24,15 @@ import java.util.List;
 @RestController
 @RequestMapping("/department")
 @PreAuthorize("hasAuthority('user:manage')")
+@RequiredArgsConstructor
 /**
  * 当前租户的部门管理接口。
  *
  * <p>所有查询与修改均强制附加当前 JWT 中的 tenantId，避免按部门 ID 跨租户访问。</p>
  */
 public class DepartmentController {
-    @Resource
-    private DepartmentService departmentService;
-    @Resource
-    private TenantContext tenantContext;
+    private final DepartmentService departmentService;
+    private final TenantContext tenantContext;
 
     /**
      * 新增一个默认启用的部门。
@@ -144,6 +143,17 @@ public class DepartmentController {
                 .eq(Department::getTenantId, tenantContext.tenantId())
                 .eq(Department::getId, id)
                 .set(Department::getStatus, "DISABLED")
+                .update();
+        return Result.success();
+    }
+
+    /** @param id 要重新启用的当前租户部门 ID。@return 空的成功响应。 */
+    @PutMapping("/{id}/enable")
+    public Result<Void> enable(@PathVariable Long id) {
+        departmentService.lambdaUpdate()
+                .eq(Department::getTenantId, tenantContext.tenantId())
+                .eq(Department::getId, id)
+                .set(Department::getStatus, "ACTIVE")
                 .update();
         return Result.success();
     }

@@ -2,3 +2,7 @@ server:
   servlet:
     context-path: /flowOps
   port: 9090
+
+flowops:
+  registration:
+    enabled: ${FLOWOPS_REGISTRATION_ENABLED:false}

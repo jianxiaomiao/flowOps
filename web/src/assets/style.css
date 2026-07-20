@@ -307,6 +307,36 @@ a {
   color: var(--color-muted);
 }
 
+.auth-switch-link {
+  display: block;
+  margin-top: var(--space-4);
+  color: var(--color-primary-dark);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.register-page {
+  display: grid;
+  min-height: 100vh;
+  padding: var(--space-6);
+  place-items: center;
+}
+
+.register-card {
+  width: min(100%, 720px);
+  padding: var(--space-7);
+  border-radius: var(--radius-xl);
+}
+
+.registration-notice {
+  margin: var(--space-4) 0 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.7;
+  text-align: center;
+}
+
 .login-card .el-form-item {
   margin-bottom: var(--space-5);
 }
@@ -1048,6 +1078,111 @@ a {
   text-align: center;
 }
 
+/* 通用业务模块 */
+.module-card {
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+}
+
+.module-toolbar,
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.detail-actions {
+  justify-content: flex-start;
+  margin: var(--space-5) 0;
+}
+
+.detail-tabs {
+  margin-top: var(--space-4);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.module-card .el-tabs__content {
+  padding-top: var(--space-3);
+}
+
+.module-card .el-table,
+.module-card .el-table tr,
+.module-card .el-table th.el-table__cell {
+  background: transparent;
+}
+
+.module-card .el-table::before,
+.module-card .el-table__inner-wrapper::before {
+  display: none;
+}
+
+.comment-item {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.comment-item + .comment-item {
+  margin-top: var(--space-3);
+}
+
+.comment-item p {
+  margin: var(--space-2) 0;
+  line-height: 1.7;
+}
+
+.comment-item small {
+  color: var(--color-muted);
+}
+
+.check-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.check-list .el-checkbox {
+  height: auto;
+  min-height: 58px;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.check-list .el-checkbox__label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  white-space: normal;
+}
+
+.check-list small {
+  margin-top: var(--space-1);
+  color: var(--color-muted);
+}
+
+.el-dialog,
+.el-drawer {
+  --el-dialog-bg-color: rgba(247, 252, 248, 0.96);
+  --el-drawer-bg-color: rgba(247, 252, 248, 0.98);
+}
+
+.el-dialog .el-select,
+.el-drawer .el-select {
+  width: 100%;
+}
+
 @media (max-width: 1180px) {
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1259,6 +1394,15 @@ a {
   .table-footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .form-grid,
+  .check-list {
+    grid-template-columns: 1fr;
+  }
+
+  .module-card {
+    padding: var(--space-4);
   }
 }
 

@@ -174,6 +174,23 @@ public class UserAccountServiceImpl
         }
     }
 
+    @Override
+    @Transactional
+    @AuditOperation(module = "USER", operation = "ENABLE", resourceType = "USER_ACCOUNT")
+    public void enableUser(Long tenantId, Long userId) {
+        UserAccount userAccount = getUser(tenantId, userId);
+        if (STATUS_ACTIVE.equals(userAccount.getStatus())) {
+            return;
+        }
+        tenantScopeValidator.requireActiveTenant(tenantId);
+        tenantScopeValidator.requireActiveDepartment(tenantId, userAccount.getDepartmentId());
+        userAccount.setStatus(STATUS_ACTIVE);
+        userAccount.setUpdatedBy(tenantContext.userId());
+        if (!updateById(userAccount)) {
+            throw new BusinessException(30002, "用户数据已被其他操作修改，请刷新后重试");
+        }
+    }
+
     /** @param username 原用户名。@return 去除首尾空格且转小写的用户名。@throws BusinessException 当用户名为空时抛出。 */
     private String normalizeUsername(String username) {
         if (!StringUtils.hasText(username)) {

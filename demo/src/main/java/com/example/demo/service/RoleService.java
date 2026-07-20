@@ -19,4 +19,6 @@ public interface RoleService extends IService<Role> {
     Page<Role> pageRoles(RolePageQuery query);
 
     void disableRole(Long tenantId, Long roleId);
+
+    void enableRole(Long tenantId, Long roleId);
 }

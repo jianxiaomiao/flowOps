@@ -81,4 +81,11 @@ public class UserAccountController {
         userAccountService.disableUser(tenantContext.tenantId(), id);
         return Result.success();
     }
+
+    /** @param id 要重新启用的用户 ID。@return 空的成功响应。 */
+    @PutMapping("/{id}/enable")
+    public Result<Void> enable(@PathVariable Long id) {
+        userAccountService.enableUser(tenantContext.tenantId(), id);
+        return Result.success();
+    }
 }

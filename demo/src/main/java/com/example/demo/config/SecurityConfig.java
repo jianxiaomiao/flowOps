@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, RegistrationProperties.class})
 /**
  * 配置 FlowOps 的无状态 JWT 安全机制。
  *
@@ -59,7 +59,7 @@ public class SecurityConfig {
                 //注意：authenticated() 只代表“你是谁已经确认”，不代表“你能做什么”。
                 //例如处理人已经登录，所以能通过这里；但他访问角色管理接口时，会在下一层 @PreAuthorize 被拒绝。
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/auth/login", "/error").permitAll()
+                        .requestMatchers("/auth/login", "/auth/register", "/error").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)

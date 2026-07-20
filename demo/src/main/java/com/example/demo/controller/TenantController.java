@@ -11,7 +11,7 @@ import com.example.demo.dto.tenant.TenantUpdateRequest;
 import com.example.demo.entity.Tenant;
 import com.example.demo.service.TenantService;
 import com.example.demo.vo.TenantResponse;
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,14 +21,14 @@ import java.util.List;
 @RestController
 @RequestMapping("/tenant")
 @PreAuthorize("hasAuthority('platform:tenant:manage')")
+@RequiredArgsConstructor
 /**
  * 平台级租户管理接口。
  *
  * <p>该接口需要平台权限，不属于普通租户管理员可访问的业务范围。</p>
  */
 public class TenantController {
-    @Resource
-    private TenantService tenantService;
+    private final TenantService tenantService;
 
     /** @param request 客户端可填写的租户资料。@return 新建且默认启用的租户。 */
     @PostMapping
@@ -102,6 +102,16 @@ public class TenantController {
         boolean updated = tenantService.lambdaUpdate()
                 .eq(Tenant::getId, id)
                 .set(Tenant::getStatus, "DISABLED")
+                .update();
+        return Result.success();
+    }
+
+    /** @param id 要重新启用的租户 ID。@return 空的成功响应。 */
+    @PutMapping("/{id}/enable")
+    public Result<Void> enable(@PathVariable Long id) {
+        tenantService.lambdaUpdate()
+                .eq(Tenant::getId, id)
+                .set(Tenant::getStatus, "ACTIVE")
                 .update();
         return Result.success();
     }

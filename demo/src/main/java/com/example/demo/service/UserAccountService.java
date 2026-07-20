@@ -19,4 +19,6 @@ public interface UserAccountService extends IService<UserAccount> {
     Page<UserAccount> pageUsers(UserAccountPageQuery query);
 
     void disableUser(Long tenantId, Long userId);
+
+    void enableUser(Long tenantId, Long userId);
 }

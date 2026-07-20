@@ -156,6 +156,23 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         }
     }
 
+    @Override
+    @Transactional
+    @AuditOperation(module = "RBAC", operation = "ENABLE_ROLE", resourceType = "ROLE")
+    public void enableRole(Long tenantId, Long roleId) {
+        Role role = getRole(tenantId, roleId);
+        assertCustomRole(role);
+        if (STATUS_ACTIVE.equals(role.getStatus())) {
+            return;
+        }
+        tenantScopeValidator.requireActiveTenant(tenantId);
+        role.setStatus(STATUS_ACTIVE);
+        role.setUpdatedBy(tenantContext.userId());
+        if (!updateById(role)) {
+            throw new BusinessException(30002, "角色数据已被其他操作修改，请刷新后重试");
+        }
+    }
+
     /** @param roleCode 原角色编码。@return 大写且去除空白后的角色编码。@throws BusinessException 当编码为空或格式非法时抛出。 */
     private String normalizeRoleCode(String roleCode) {
         if (!StringUtils.hasText(roleCode)) {

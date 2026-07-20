@@ -13,8 +13,8 @@ const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
 const form = reactive<LoginRequest>({
-  tenantCode: '',
-  username: '',
+  tenantCode: typeof route.query.tenantCode === 'string' ? route.query.tenantCode : '',
+  username: typeof route.query.username === 'string' ? route.query.username : '',
   password: '',
 })
 
@@ -87,6 +87,7 @@ async function submitLogin() {
         </el-form>
 
         <p class="login-card__footer">登录即表示你正在访问所在企业的安全工作空间</p>
+        <RouterLink class="auth-switch-link" to="/register">还没有企业账号？创建企业</RouterLink>
       </div>
     </section>
   </main>

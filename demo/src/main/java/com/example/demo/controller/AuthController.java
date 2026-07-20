@@ -2,11 +2,14 @@ package com.example.demo.controller;
 
 import com.example.demo.common.Result;
 import com.example.demo.dto.auth.LoginRequest;
+import com.example.demo.dto.auth.TenantRegistrationRequest;
 import com.example.demo.security.CurrentUser;
 import com.example.demo.security.CurrentUserProvider;
 import com.example.demo.service.AuthService;
+import com.example.demo.service.OnboardingService;
 import com.example.demo.vo.CurrentUserResponse;
 import com.example.demo.vo.LoginResponse;
+import com.example.demo.vo.TenantRegistrationResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
     private final AuthService authService;
     private final CurrentUserProvider currentUserProvider;
+    private final OnboardingService onboardingService;
 
     /**
      * 使用租户编码、用户名和密码创建 JWT。
@@ -30,6 +34,12 @@ public class AuthController {
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return Result.success(authService.login(request));
+    }
+
+    /** 创建新企业、默认部门和首位管理员。 */
+    @PostMapping("/register")
+    public Result<TenantRegistrationResponse> register(@Valid @RequestBody TenantRegistrationRequest request) {
+        return Result.success(onboardingService.registerTenant(request));
     }
 
     /**
