@@ -34,6 +34,30 @@ server:
     context-path: /flowOps
   port: 8080
 
+# 只通过 HTTP 暴露健康、应用信息和 Prometheus 抓取端点；敏感配置与 heapdump 等端点保持关闭。
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: flowops
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms,300ms,1s,3s
+
 # 默认从 demo 目录启动时写入 flowops/logger；可用环境变量 FLOWOPS_LOG_PATH 覆盖。
 flowops:
   redis:

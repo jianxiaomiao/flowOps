@@ -15,6 +15,7 @@ FlowOps 是一个面向企业内部协作的多租户工单流转平台。它把
 - Transactional Outbox、RabbitMQ 重试/死信和通知消费幂等；
 - Redis 分布式登录/注册限流、通知未读数缓存和 JWT 撤销/会话版本；
 - 站内通知收件箱、操作日志和审计日志；
+- Actuator 健康检查、Prometheus 指标、SLA 扫描业务指标、Grafana 预置看板和最小告警规则；
 - Vue 3 管理界面和 53/53 后端 HTTP 操作的类型安全接入；
 - Postman 全流程 Collection 和后端自动化测试。
 
@@ -24,14 +25,14 @@ FlowOps 是一个面向企业内部协作的多租户工单流转平台。它把
 | --- | --- | --- |
 | 后端 | Java 21、Spring Boot 3.5 | HTTP API、业务编排、事务和应用配置 |
 | 安全 | Spring Security、JWT、BCrypt | 无状态认证、方法级授权和密码摘要 |
-| 持久化 | MySQL 8、MyBatis-Plus 3.5 | 多租户业务数据、分页、自动填充和乐观锁 |
+| 持久化 | MySQL 8.4、MyBatis-Plus 3.5 | 多租户业务数据、分页、自动填充和乐观锁 |
 | 消息 | RabbitMQ、Spring AMQP | 异步通知、重试和死信处理；可通过功能开关关闭 |
 | 缓存 | Redis、Spring Data Redis、Lettuce | 分布式限流、未读数 Cache Aside、Token 撤销和带 TTL 共享状态 |
 | 前端 | Vue 3、TypeScript、Vite | SPA 页面、类型安全和开发代理 |
 | 前端生态 | Vue Router、Pinia、Axios、Element Plus | 权限路由、登录状态、HTTP 封装和业务组件 |
 | 数据库迁移 | Flyway | 版本化建表、权限种子和现有数据库 baseline |
 | 测试 | JUnit 5、Mockito、Spring Boot Test、Postman、Playwright | 领域规则、认证、消息幂等、接口和浏览器闭环验证 |
-| 本地基础设施 | Docker Compose | 启动并持久化 RabbitMQ |
+| 本地基础设施 | Docker Compose、Prometheus、Grafana | 启动并持久化 MySQL、Redis、RabbitMQ 与本地可观测性栈 |
 
 ## 核心设计理念
 
@@ -104,7 +105,8 @@ flowops/
 │     ├─ views/             # 工单、通知和管理页面
 │     └─ assets/style.css   # 全局统一样式
 ├─ docs/                    # 架构、API、测试、ADR 和实施计划
-├─ compose.yaml             # RabbitMQ 本地环境
+├─ monitoring/              # Prometheus、Grafana、RabbitMQ 指标配置
+├─ compose.yaml             # 完整本地基础设施与可观测性栈
 └─ AGENTS.md                # 学习型协作与编码规范
 ```
 
@@ -204,6 +206,9 @@ npm run build
 - [Redis 接入计划](docs/10-redis-integration-plan.md)
 - [Playwright 与 Flyway 验证](docs/11-playwright-flyway-verification.md)
 - [Docker 与配置分层指南](docs/12-docker-configuration-guide.md)
+- [CI 自动验收](docs/13-ci-quality-gate.md)
+- [监控与健康检查](docs/14-observability-and-health-checks.md)
+- [数据可靠性与生产基线](docs/15-data-reliability-and-production-baseline.md)
 - [架构决策记录](docs/adr/)
 
 ## 当前边界与后续方向

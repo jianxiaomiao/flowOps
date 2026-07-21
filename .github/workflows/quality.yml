@@ -110,6 +110,7 @@ jobs:
       FLOWOPS_REDIS_PASSWORD: flowops-ci-redis-password
       FLOWOPS_RABBITMQ_PASSWORD: flowops-ci-rabbitmq-password
       FLOWOPS_JWT_SECRET: flowops-ci-jwt-secret-must-be-at-least-32-bytes
+      FLOWOPS_GRAFANA_ADMIN_PASSWORD: grafana-ci-local-only-password
       FLOWOPS_REGISTRATION_ENABLED: "true"
       FLOWOPS_E2E_TENANT_CODE: E2ECI
       FLOWOPS_E2E_USERNAME: e2e_admin

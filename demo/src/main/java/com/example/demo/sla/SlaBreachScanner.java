@@ -3,6 +3,7 @@ package com.example.demo.sla;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.demo.entity.Ticket;
 import com.example.demo.mapper.TicketMapper;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,6 +24,7 @@ import java.util.List;
 public class SlaBreachScanner {
     private final TicketMapper ticketMapper;
     private final SlaBreachProcessor processor;
+    private final SlaScanMetrics metrics;
 
     @Scheduled(fixedDelayString = "${flowops.sla.scan-delay:60s}")
     /**
@@ -31,20 +33,31 @@ public class SlaBreachScanner {
      * <p>单张工单失败不会中断后续处理，下一轮扫描仍会重试符合条件的数据。</p>
      */
     public void scan() {
-        LocalDateTime now = LocalDateTime.now();
-        List<Ticket> dueTickets = ticketMapper.selectList(Wrappers.lambdaQuery(Ticket.class)
-                .and(wrapper -> wrapper
-                        .eq(Ticket::getResponseSlaStatus, "PENDING").le(Ticket::getResponseDueAt, now)
-                        .or()
-                        .eq(Ticket::getResolutionSlaStatus, "PENDING").le(Ticket::getResolutionDueAt, now))
-                .orderByAsc(Ticket::getId)
-                .last("LIMIT 100"));
-        for (Ticket ticket : dueTickets) {
-            try {
-                processor.process(ticket.getId());
-            } catch (Exception exception) {
-                log.error("处理 SLA 超时失败 ticketId={}", ticket.getId(), exception);
+        Timer.Sample sample = metrics.startTimer();
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            List<Ticket> dueTickets = ticketMapper.selectList(Wrappers.lambdaQuery(Ticket.class)
+                    .and(wrapper -> wrapper
+                            .eq(Ticket::getResponseSlaStatus, "PENDING").le(Ticket::getResponseDueAt, now)
+                            .or()
+                            .eq(Ticket::getResolutionSlaStatus, "PENDING").le(Ticket::getResolutionDueAt, now))
+                    .orderByAsc(Ticket::getId)
+                    .last("LIMIT 100"));
+            for (Ticket ticket : dueTickets) {
+                try {
+                    processor.process(ticket.getId());
+                } catch (Exception exception) {
+                    metrics.recordTicketFailure();
+                    log.error("处理 SLA 超时失败 ticketId={}", ticket.getId(), exception);
+                }
             }
+            metrics.recordSuccess();
+        } catch (RuntimeException exception) {
+            metrics.recordScanFailure();
+            log.error("扫描 SLA 超时工单失败", exception);
+            throw exception;
+        } finally {
+            metrics.stopTimer(sample);
         }
     }
 }
