@@ -108,17 +108,35 @@ com.flowops
 
 除平台级配置表外，所有业务表均含 `tenant_id`，并建立以 `tenant_id` 开头的组合索引。例如 `ticket(tenant_id, status, updated_at)`、`ticket(tenant_id, creator_id, created_at)`。
 
-## 7. 首批 API
+## 7. 当前 HTTP API（以 Controller 为准）
+
+当前应用**没有**全局 `/api/v1` 前缀；资源路径也沿用既有的单数命名。前端联调必须以实际 Controller 映射和 [06-api-contract.md](06-api-contract.md) 为准，而不是使用早期草案中的 `/api/v1/tickets`。
+
+| 资源 | Controller 根路径 | 已实现能力 |
+| --- | --- | --- |
+| 认证 | `/auth` | 登录并获取 JWT |
+| 工单 | `/ticket` | 创建、详情、分页、分派、状态流转、评论和三类历史 |
+| 通知 | `/notification` | 收件箱分页、标记已读 |
+| 用户与组织 | `/tenant`、`/department`、`/user-account` | 租户、部门、用户账号管理 |
+| 授权 | `/role`、`/permission`、`/role-permission`、`/user-role` | 角色、权限字典与授权关系管理 |
+| SLA | `/sla-policy` | SLA 策略创建、更新、详情与分页 |
+
+工单主链路的实际接口如下：
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/api/v1/auth/login` | 登录并取得 JWT |
-| POST | `/api/v1/tickets` | 创建工单 |
-| GET | `/api/v1/tickets` | 按数据权限分页查询工单 |
-| GET | `/api/v1/tickets/{id}` | 查看工单详情及历史 |
-| POST | `/api/v1/tickets/{id}/assignments` | 分派处理人 |
-| POST | `/api/v1/tickets/{id}/transitions` | 执行业务动作（接单、处理、解决等） |
-| POST | `/api/v1/tickets/{id}/comments` | 追加评论 |
+| POST | `/auth/login` | 登录并取得 JWT |
+| POST | `/ticket` | 创建工单 |
+| GET | `/ticket/page` | 按当前用户数据范围分页查询工单 |
+| GET | `/ticket/{id}` | 查看一张有权限读取的工单 |
+| POST | `/ticket/{id}/assignments` | 分派或重新分派工单 |
+| POST | `/ticket/{id}/transitions` | 执行业务动作（接单、处理、提交方案、确认、驳回、关闭） |
+| POST | `/ticket/{id}/comments` | 追加评论 |
+| GET | `/ticket/{id}/transitions` | 查询状态流转历史 |
+| GET | `/ticket/{id}/assignments` | 查询分派历史 |
+| GET | `/ticket/{id}/comments` | 查询评论 |
+
+完整的请求字段、响应模型、权限和错误处理约定见 [06-api-contract.md](06-api-contract.md)。
 
 ## 8. 开发顺序
 
