@@ -29,6 +29,7 @@ const router = createRouter({
         { path: '', redirect: '/tickets' },
         { path: 'tickets', name: 'tickets', component: () => import('@/views/TicketWorkspaceView.vue'), meta: { title: '工单中心' } },
         { path: 'notifications', name: 'notifications', component: () => import('@/views/NotificationView.vue'), meta: { title: '消息通知' } },
+        { path: 'knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeBaseView.vue'), meta: { title: '知识库' } },
         { path: 'organization', name: 'organization', component: () => import('@/views/OrganizationView.vue'), meta: { title: '部门与成员', authority: 'user:manage' } },
         { path: 'rbac', name: 'rbac', component: () => import('@/views/RbacView.vue'), meta: { title: '角色权限', authority: 'role:manage' } },
         { path: 'sla', name: 'sla', component: () => import('@/views/SlaPolicyView.vue'), meta: { title: 'SLA 策略', authority: 'sla:manage' } },

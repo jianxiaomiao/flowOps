@@ -6,9 +6,10 @@ import { useAuthStore } from '@/stores/auth'
 import { fetchDepartments, fetchUserPage } from '@/services/organization'
 import {
   addTicketComment, assignTicket, createTicket, fetchTicket, fetchTicketAssignments,
-  fetchTicketComments, fetchTicketPage, fetchTicketTransitions, transitionTicket,
+  fetchTicketComments, fetchTicketKnowledgeArticles, fetchTicketPage, fetchTicketTransitions, transitionTicket,
 } from '@/services/ticket'
-import type { Department, TicketAction, TicketAssignmentRecord, TicketComment, TicketPreview, TicketStatus, TicketTransitionRecord, UserAccount } from '@/types/api'
+import { fetchKnowledgePage, linkKnowledgeArticleToTicket } from '@/services/knowledge'
+import type { Department, KnowledgeArticle, TicketAction, TicketAssignmentRecord, TicketComment, TicketPreview, TicketStatus, TicketTransitionRecord, UserAccount } from '@/types/api'
 
 const auth = useAuthStore()
 const tickets = ref<TicketPreview[]>([])
@@ -29,6 +30,10 @@ const selected = ref<TicketPreview | null>(null)
 const transitions = ref<TicketTransitionRecord[]>([])
 const assignments = ref<TicketAssignmentRecord[]>([])
 const comments = ref<TicketComment[]>([])
+const knowledgeArticles = ref<KnowledgeArticle[]>([])
+const knowledgeLinkVisible = ref(false)
+const knowledgeKeyword = ref('')
+const knowledgeCandidates = ref<KnowledgeArticle[]>([])
 
 const createForm = reactive({ handlingDepartmentId: undefined as number | undefined, title: '', description: '', ticketType: 'INCIDENT', priority: 'P2' as 'P0' | 'P1' | 'P2' })
 const assignmentForm = reactive({ toDepartmentId: undefined as number | undefined, toAssigneeId: undefined as number | undefined, reason: '' })
@@ -64,8 +69,8 @@ async function submitCreate() {
 async function openDetail(row: TicketPreview) {
   detailVisible.value = true
   selected.value = await fetchTicket(row.id)
-  const [transitionRows, assignmentRows, commentRows] = await Promise.all([fetchTicketTransitions(row.id), fetchTicketAssignments(row.id), fetchTicketComments(row.id)])
-  transitions.value = transitionRows; assignments.value = assignmentRows; comments.value = commentRows
+  const [transitionRows, assignmentRows, commentRows, linkedArticles] = await Promise.all([fetchTicketTransitions(row.id), fetchTicketAssignments(row.id), fetchTicketComments(row.id), fetchTicketKnowledgeArticles(row.id)])
+  transitions.value = transitionRows; assignments.value = assignmentRows; comments.value = commentRows; knowledgeArticles.value = linkedArticles
 }
 
 async function submitAssignment() {
@@ -93,6 +98,10 @@ async function submitComment() {
   await addTicketComment(selected.value.id, { content: commentForm.content, visibility: commentForm.visibility })
   commentVisible.value = false; commentForm.content = ''; ElMessage.success('评论已添加'); await openDetail(selected.value)
 }
+
+async function searchKnowledge() { const page = await fetchKnowledgePage({ pageNum: 1, pageSize: 10, keyword: knowledgeKeyword.value || undefined }); knowledgeCandidates.value = page.records }
+async function openKnowledgeLink() { knowledgeLinkVisible.value = true; await searchKnowledge() }
+async function linkKnowledge(value: unknown) { const article = value as KnowledgeArticle; if (!selected.value) return; await linkKnowledgeArticleToTicket(article.id, selected.value.id); ElMessage.success('知识文章已关联'); knowledgeArticles.value = await fetchTicketKnowledgeArticles(selected.value.id); knowledgeLinkVisible.value = false }
 
 onMounted(async () => { await Promise.all([loadTickets(), loadOptions()]) })
 </script>
@@ -130,11 +139,12 @@ onMounted(async () => { await Promise.all([loadTickets(), loadOptions()]) })
         <div class="detail-actions"><el-button v-if="auth.hasAuthority('ticket:assign')" @click="assignmentVisible=true">分派</el-button><el-button v-for="action in availableActions" :key="action" type="primary" @click="executeAction(action)">{{ actionLabels[action] }}</el-button><el-button v-if="auth.hasAuthority('ticket:update')" @click="commentVisible=true">添加评论</el-button></div>
         <el-tabs class="detail-tabs"><el-tab-pane label="状态历史"><el-timeline><el-timeline-item v-for="item in transitions" :key="item.id" :timestamp="item.createdAt">{{ item.fromStatus }} → {{ item.toStatus }} · {{ item.action }}<p>{{ item.remark }}</p></el-timeline-item></el-timeline></el-tab-pane>
           <el-tab-pane label="分派历史"><el-timeline><el-timeline-item v-for="item in assignments" :key="item.id" :timestamp="item.createdAt">部门 {{ item.fromDepartmentId ?? '-' }} → {{ item.toDepartmentId }}，处理人 {{ item.toAssigneeId ?? '未指定' }}</el-timeline-item></el-timeline></el-tab-pane>
-          <el-tab-pane label="评论"><div v-for="item in comments" :key="item.id" class="comment-item"><strong>用户 #{{ item.authorId }} · {{ item.visibility }}</strong><p>{{ item.content }}</p><small>{{ item.createdAt }}</small></div></el-tab-pane></el-tabs>
+          <el-tab-pane label="评论"><div v-for="item in comments" :key="item.id" class="comment-item"><strong>用户 #{{ item.authorId }} · {{ item.visibility }}</strong><p>{{ item.content }}</p><small>{{ item.createdAt }}</small></div></el-tab-pane><el-tab-pane label="知识关联"><el-button v-if="auth.hasAuthority('knowledge:write') || auth.hasAuthority('knowledge:manage')" @click="openKnowledgeLink">关联知识</el-button><div v-for="item in knowledgeArticles" :key="item.id" class="comment-item"><strong>{{ item.title }}</strong><p>{{ item.summary || item.content }}</p><small>{{ item.visibility }} · {{ item.updatedAt }}</small></div></el-tab-pane></el-tabs>
       </template>
     </el-drawer>
 
     <el-dialog v-model="assignmentVisible" title="分派工单" width="480px"><el-form label-position="top"><el-form-item label="目标部门"><el-select v-model="assignmentForm.toDepartmentId"><el-option v-for="item in departments" :key="item.id" :label="item.departmentName" :value="item.id" /></el-select></el-form-item><el-form-item label="目标处理人（可选）"><el-select v-model="assignmentForm.toAssigneeId" clearable><el-option v-for="item in users" :key="item.id" :label="item.displayName" :value="item.id" /></el-select></el-form-item><el-form-item label="原因"><el-input v-model="assignmentForm.reason" type="textarea" /></el-form-item></el-form><template #footer><el-button @click="assignmentVisible=false">取消</el-button><el-button type="primary" @click="submitAssignment">确认分派</el-button></template></el-dialog>
     <el-dialog v-model="commentVisible" title="添加评论" width="480px"><el-form label-position="top"><el-form-item label="可见性"><el-radio-group v-model="commentForm.visibility"><el-radio value="PUBLIC">公开</el-radio><el-radio value="INTERNAL">内部</el-radio></el-radio-group></el-form-item><el-form-item label="内容"><el-input v-model="commentForm.content" type="textarea" :rows="4" /></el-form-item></el-form><template #footer><el-button @click="commentVisible=false">取消</el-button><el-button type="primary" @click="submitComment">提交</el-button></template></el-dialog>
+    <el-dialog v-model="knowledgeLinkVisible" title="关联知识文章" width="620px"><form class="ticket-toolbar" @submit.prevent="searchKnowledge"><el-input v-model="knowledgeKeyword" placeholder="搜索可见知识" clearable /><el-button type="primary" native-type="submit">检索</el-button></form><el-table :data="knowledgeCandidates"><el-table-column prop="title" label="标题" /><el-table-column prop="summary" label="摘要" /><el-table-column label="操作" width="90"><template #default="scope"><el-button link type="primary" @click="linkKnowledge(scope.row)">关联</el-button></template></el-table-column></el-table></el-dialog>
   </main>
 </template>

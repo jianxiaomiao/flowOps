@@ -3,6 +3,7 @@ import type {
   ApiResult, PageResult, TicketAssignmentRecord, TicketAssignmentRequest, TicketComment,
   TicketCommentCreateRequest, TicketCreateRequest, TicketPageQuery, TicketPreview,
   TicketTransitionRecord, TicketTransitionRequest,
+  KnowledgeArticle,
 } from '@/types/api'
 
 export async function fetchTicketPage(query: TicketPageQuery) {
@@ -49,5 +50,10 @@ export async function fetchTicketAssignments(id: number) {
 
 export async function fetchTicketComments(id: number) {
   const response = await http.get<ApiResult<TicketComment[]>>(`/ticket/${id}/comments`)
+  return response.data.data
+}
+
+export async function fetchTicketKnowledgeArticles(id: number) {
+  const response = await http.get<ApiResult<KnowledgeArticle[]>>(`/ticket/${id}/knowledge-articles`)
   return response.data.data
 }

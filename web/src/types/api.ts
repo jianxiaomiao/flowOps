@@ -300,3 +300,51 @@ export interface PageQuery {
   pageSize: number
   [key: string]: string | number | boolean | undefined
 }
+
+export type KnowledgeArticleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+export type KnowledgeVisibility = 'TENANT' | 'DEPARTMENT'
+
+export interface KnowledgeCategory {
+  id: number
+  tenantId: number
+  parentId: number | null
+  categoryCode: string
+  categoryName: string
+  description: string | null
+  sortOrder: number
+  status: 'ACTIVE' | 'DISABLED'
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface KnowledgeArticle {
+  id: number
+  tenantId: number
+  categoryId: number
+  title: string
+  summary: string | null
+  content: string
+  status: KnowledgeArticleStatus
+  visibility: KnowledgeVisibility
+  departmentId: number | null
+  authorId: number
+  publishedAt: string | null
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface KnowledgeArticlePageQuery extends PageQuery {
+  categoryId?: number
+  keyword?: string
+}
+
+export interface KnowledgeArticlePayload {
+  categoryId: number
+  title: string
+  summary?: string
+  content: string
+  visibility: KnowledgeVisibility
+  departmentId?: number
+}

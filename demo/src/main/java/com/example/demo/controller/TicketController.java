@@ -5,6 +5,7 @@ import com.example.demo.common.Result;
 import com.example.demo.converter.TicketConverter;
 import com.example.demo.dto.ticket.*;
 import com.example.demo.service.TicketService;
+import com.example.demo.service.KnowledgeService;
 import com.example.demo.security.TenantContext;
 import com.example.demo.vo.*;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TicketController {
     private final TicketService ticketService;
+    private final KnowledgeService knowledgeService;
     private final TenantContext tenantContext;
 
     /**
@@ -129,5 +131,12 @@ public class TicketController {
     @PreAuthorize("@ticketReadScope.canRead(#id)")
     public Result<List<TicketCommentResponse>> comments(@PathVariable @Positive Long id) {
         return Result.success(ticketService.listComments(tenantContext.tenantId(), id).stream().map(TicketConverter::toResponse).toList());
+    }
+
+    /** 查询当前用户可读取的工单所关联、且当前用户也有权查看的知识文章。 */
+    @GetMapping("/{id}/knowledge-articles")
+    @PreAuthorize("@ticketReadScope.canRead(#id)")
+    public Result<List<KnowledgeArticleResponse>> knowledgeArticles(@PathVariable @Positive Long id) {
+        return Result.success(knowledgeService.listVisibleArticlesForTicket(id).stream().map(com.example.demo.converter.KnowledgeConverter::toResponse).toList());
     }
 }

@@ -39,11 +39,6 @@ export default defineConfig({
               test: /[\\/]node_modules[\\/](?:element-plus|@element-plus)[\\/]/,
               priority: 2,
             },
-            {
-              name: 'vendor-http',
-              test: /[\\/]node_modules[\\/]axios[\\/]/,
-              priority: 0,
-            },
           ],
         },
       },
