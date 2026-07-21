@@ -19,4 +19,34 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-vue',
+              test: /[\\/]node_modules[\\/](?:vue|@vue|vue-router|pinia)[\\/]/,
+              priority: 4,
+            },
+            {
+              name: 'vendor-ui-utils',
+              test: /[\\/]node_modules[\\/](?:@ctrl|@floating-ui|@popperjs|@sxzz|@vueuse|async-validator|dayjs|lodash(?:-es|-unified)?|memoize-one|normalize-wheel-es)[\\/]/,
+              priority: 3,
+            },
+            {
+              name: 'vendor-element-plus',
+              test: /[\\/]node_modules[\\/](?:element-plus|@element-plus)[\\/]/,
+              priority: 2,
+            },
+            {
+              name: 'vendor-http',
+              test: /[\\/]node_modules[\\/]axios[\\/]/,
+              priority: 0,
+            },
+          ],
+        },
+      },
+    },
+  },
 })

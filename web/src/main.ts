@@ -1,5 +1,33 @@
 import { createApp } from 'vue'
-import ElementPlus, { ElMessage } from 'element-plus'
+import {
+  ElBadge,
+  ElButton,
+  ElCheckbox,
+  ElDescriptions,
+  ElDescriptionsItem,
+  ElDialog,
+  ElDrawer,
+  ElForm,
+  ElFormItem,
+  ElIcon,
+  ElInput,
+  ElInputNumber,
+  ElLoading,
+  ElMessage,
+  ElOption,
+  ElPagination,
+  ElRadio,
+  ElRadioGroup,
+  ElSelect,
+  ElSwitch,
+  ElTable,
+  ElTableColumn,
+  ElTabPane,
+  ElTabs,
+  ElTag,
+  ElTimeline,
+  ElTimelineItem,
+} from 'element-plus'
 import 'element-plus/dist/index.css'
 import './assets/style.css'
 import App from './App.vue'
@@ -9,6 +37,36 @@ import { useAuthStore } from './stores/auth'
 import { ApiError } from './services/http'
 
 const app = createApp(App)
+const elementComponents = [
+  ElBadge,
+  ElButton,
+  ElCheckbox,
+  ElDescriptions,
+  ElDescriptionsItem,
+  ElDialog,
+  ElDrawer,
+  ElForm,
+  ElFormItem,
+  ElIcon,
+  ElInput,
+  ElInputNumber,
+  ElOption,
+  ElPagination,
+  ElRadio,
+  ElRadioGroup,
+  ElSelect,
+  ElSwitch,
+  ElTable,
+  ElTableColumn,
+  ElTabPane,
+  ElTabs,
+  ElTag,
+  ElTimeline,
+  ElTimelineItem,
+]
+
+elementComponents.forEach((component) => app.use(component))
+app.use(ElLoading)
 
 app.config.errorHandler = (error) => {
   if (error instanceof ApiError) {
@@ -26,5 +84,4 @@ app.config.errorHandler = (error) => {
 app
   .use(pinia)
   .use(router)
-  .use(ElementPlus)
   .mount('#app')

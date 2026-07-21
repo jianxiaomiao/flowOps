@@ -2,10 +2,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { ACCESS_TOKEN_KEY } from '@/constants/auth'
 import { useAuthStore } from '@/stores/auth'
 import { pinia } from '@/stores'
-import LoginView from '@/views/LoginView.vue'
-// @ts-ignore
-import RegisterView from '@/views/RegisterView.vue'
-import AppLayout from '@/layouts/AppLayout.vue'
+
+const LoginView = () => import('@/views/LoginView.vue')
+const RegisterView = () => import('@/views/RegisterView.vue')
+const AppLayout = () => import('@/layouts/AppLayout.vue')
 
 const router = createRouter({
   history: createWebHistory(),

@@ -1,0 +1,5 @@
+target/
+.m2repo/
+*.iml
+application-local.yml
+src/main/resources/application-local.yml
