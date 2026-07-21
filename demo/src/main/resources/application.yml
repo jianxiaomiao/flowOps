@@ -15,6 +15,19 @@ spring:
     baseline-version: 1
     validate-on-migrate: true
     clean-disabled: true
+  ai:
+    ollama:
+      base-url: ${FLOWOPS_OLLAMA_URL:http://localhost:11434}
+      embedding:
+        options:
+          model: ${FLOWOPS_OLLAMA_EMBEDDING_MODEL:qwen3-embedding-4b}
+    vectorstore:
+      milvus:
+        client:
+          host: ${FLOWOPS_MILVUS_HOST:localhost}
+          port: ${FLOWOPS_MILVUS_PORT:19530}
+        index-name: knowledge_article_chunks
+        embedding-dimension: 2560
   rabbitmq:
     publisher-confirm-type: correlated
     publisher-returns: true

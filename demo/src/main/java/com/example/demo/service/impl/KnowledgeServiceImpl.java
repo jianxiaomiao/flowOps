@@ -14,6 +14,7 @@ import com.example.demo.security.CurrentUserProvider;
 import com.example.demo.security.TicketReadScope;
 import com.example.demo.security.TenantContext;
 import com.example.demo.service.KnowledgeService;
+import com.example.demo.messaging.OutboxEventService;
 import com.example.demo.validator.TenantScopeValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,14 +33,16 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeArticleMapper, Kn
     private final TenantContext tenantContext;
     private final CurrentUserProvider currentUserProvider;
     private final TicketReadScope ticketReadScope;
+    private final OutboxEventService outboxEventService;
 
     public KnowledgeServiceImpl(KnowledgeCategoryMapper categoryMapper, KnowledgeArticleTicketMapper ticketLinkMapper,
                                 UserAccountMapper userAccountMapper, TenantScopeValidator tenantScopeValidator,
                                 TenantContext tenantContext, CurrentUserProvider currentUserProvider,
-                                TicketReadScope ticketReadScope) {
+                                TicketReadScope ticketReadScope, OutboxEventService outboxEventService) {
         this.categoryMapper = categoryMapper; this.ticketLinkMapper = ticketLinkMapper; this.userAccountMapper = userAccountMapper;
         this.tenantScopeValidator = tenantScopeValidator; this.tenantContext = tenantContext;
         this.currentUserProvider = currentUserProvider; this.ticketReadScope = ticketReadScope;
+        this.outboxEventService = outboxEventService;
     }
 
     @Override @Transactional @AuditOperation(module = "KNOWLEDGE", operation = "CREATE_CATEGORY", resourceType = "KNOWLEDGE_CATEGORY")
@@ -83,6 +86,11 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeArticleMapper, Kn
         if ("ARCHIVED".equals(article.getStatus())) throw new BusinessException(30001, "已归档文章不能编辑");
         requireCategory(user.tenantId(), request.getCategoryId()); applyArticleInput(article, request, user.tenantId()); article.setVersion(request.getVersion()); article.setUpdatedBy(user.userId());
         if (!updateById(article)) throw new BusinessException(30002, "知识文章已被其他操作修改，请刷新后重试");
+        
+        if ("PUBLISHED".equals(article.getStatus())) {
+            outboxEventService.enqueue(user.tenantId(), "KNOWLEDGE_ARTICLE", article.getId(), "KNOWLEDGE_ARTICLE_UPDATED", 
+                java.util.Map.of("articleId", article.getId(), "title", article.getTitle(), "content", article.getContent(), "version", article.getVersion()));
+        }
         return article;
     }
 
@@ -101,6 +109,10 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeArticleMapper, Kn
         if (!"DRAFT".equals(article.getStatus())) throw new BusinessException(30001, "只有草稿可以发布");
         article.setStatus("PUBLISHED"); article.setPublishedAt(LocalDateTime.now()); article.setVersion(request.getVersion()); article.setUpdatedBy(user.userId());
         if (!updateById(article)) throw new BusinessException(30002, "知识文章已被其他操作修改，请刷新后重试");
+        
+        outboxEventService.enqueue(user.tenantId(), "KNOWLEDGE_ARTICLE", article.getId(), "KNOWLEDGE_ARTICLE_PUBLISHED", 
+            java.util.Map.of("articleId", article.getId(), "title", article.getTitle(), "content", article.getContent(), "version", article.getVersion()));
+            
         return article;
     }
 
@@ -110,6 +122,10 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeArticleMapper, Kn
         if ("ARCHIVED".equals(article.getStatus())) return article;
         article.setStatus("ARCHIVED"); article.setVersion(request.getVersion()); article.setUpdatedBy(user.userId());
         if (!updateById(article)) throw new BusinessException(30002, "知识文章已被其他操作修改，请刷新后重试");
+        
+        outboxEventService.enqueue(user.tenantId(), "KNOWLEDGE_ARTICLE", article.getId(), "KNOWLEDGE_ARTICLE_ARCHIVED", 
+            java.util.Map.of("articleId", article.getId()));
+            
         return article;
     }
 

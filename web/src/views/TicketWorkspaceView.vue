@@ -7,9 +7,10 @@ import { fetchDepartments, fetchUserPage } from '@/services/organization'
 import {
   addTicketComment, assignTicket, createTicket, fetchTicket, fetchTicketAssignments,
   fetchTicketComments, fetchTicketKnowledgeArticles, fetchTicketPage, fetchTicketTransitions, transitionTicket,
+  fetchTicketRecommendations, submitRecommendationFeedback,
 } from '@/services/ticket'
 import { fetchKnowledgePage, linkKnowledgeArticleToTicket } from '@/services/knowledge'
-import type { Department, KnowledgeArticle, TicketAction, TicketAssignmentRecord, TicketComment, TicketPreview, TicketStatus, TicketTransitionRecord, UserAccount } from '@/types/api'
+import type { Department, KnowledgeArticle, TicketAction, TicketAssignmentRecord, TicketComment, TicketPreview, TicketStatus, TicketTransitionRecord, UserAccount, KnowledgeRecommendationDTO } from '@/types/api'
 
 const auth = useAuthStore()
 const tickets = ref<TicketPreview[]>([])
@@ -34,6 +35,7 @@ const knowledgeArticles = ref<KnowledgeArticle[]>([])
 const knowledgeLinkVisible = ref(false)
 const knowledgeKeyword = ref('')
 const knowledgeCandidates = ref<KnowledgeArticle[]>([])
+const recommendations = ref<KnowledgeRecommendationDTO[]>([])
 
 const createForm = reactive({ handlingDepartmentId: undefined as number | undefined, title: '', description: '', ticketType: 'INCIDENT', priority: 'P2' as 'P0' | 'P1' | 'P2' })
 const assignmentForm = reactive({ toDepartmentId: undefined as number | undefined, toAssigneeId: undefined as number | undefined, reason: '' })
@@ -69,8 +71,8 @@ async function submitCreate() {
 async function openDetail(row: TicketPreview) {
   detailVisible.value = true
   selected.value = await fetchTicket(row.id)
-  const [transitionRows, assignmentRows, commentRows, linkedArticles] = await Promise.all([fetchTicketTransitions(row.id), fetchTicketAssignments(row.id), fetchTicketComments(row.id), fetchTicketKnowledgeArticles(row.id)])
-  transitions.value = transitionRows; assignments.value = assignmentRows; comments.value = commentRows; knowledgeArticles.value = linkedArticles
+  const [transitionRows, assignmentRows, commentRows, linkedArticles, recs] = await Promise.all([fetchTicketTransitions(row.id), fetchTicketAssignments(row.id), fetchTicketComments(row.id), fetchTicketKnowledgeArticles(row.id), fetchTicketRecommendations(row.id).catch(()=>[])])
+  transitions.value = transitionRows; assignments.value = assignmentRows; comments.value = commentRows; knowledgeArticles.value = linkedArticles; recommendations.value = recs as KnowledgeRecommendationDTO[]
 }
 
 async function submitAssignment() {
@@ -102,6 +104,20 @@ async function submitComment() {
 async function searchKnowledge() { const page = await fetchKnowledgePage({ pageNum: 1, pageSize: 10, keyword: knowledgeKeyword.value || undefined }); knowledgeCandidates.value = page.records }
 async function openKnowledgeLink() { knowledgeLinkVisible.value = true; await searchKnowledge() }
 async function linkKnowledge(value: unknown) { const article = value as KnowledgeArticle; if (!selected.value) return; await linkKnowledgeArticleToTicket(article.id, selected.value.id); ElMessage.success('知识文章已关联'); knowledgeArticles.value = await fetchTicketKnowledgeArticles(selected.value.id); knowledgeLinkVisible.value = false }
+async function handleFeedback(articleId: number, status: 'ADOPTED' | 'REJECTED') {
+  if (!selected.value) return
+  await submitRecommendationFeedback(selected.value.id, articleId, { status })
+  const rec = recommendations.value.find((r) => r.articleId === articleId)
+  if (rec) rec.feedbackStatus = status
+  
+  if (status === 'ADOPTED') {
+    await linkKnowledgeArticleToTicket(articleId, selected.value.id)
+    knowledgeArticles.value = await fetchTicketKnowledgeArticles(selected.value.id)
+    ElMessage.success('已采用并关联知识文章')
+  } else {
+    ElMessage.success('反馈已提交')
+  }
+}
 
 onMounted(async () => { await Promise.all([loadTickets(), loadOptions()]) })
 </script>
@@ -139,7 +155,24 @@ onMounted(async () => { await Promise.all([loadTickets(), loadOptions()]) })
         <div class="detail-actions"><el-button v-if="auth.hasAuthority('ticket:assign')" @click="assignmentVisible=true">分派</el-button><el-button v-for="action in availableActions" :key="action" type="primary" @click="executeAction(action)">{{ actionLabels[action] }}</el-button><el-button v-if="auth.hasAuthority('ticket:update')" @click="commentVisible=true">添加评论</el-button></div>
         <el-tabs class="detail-tabs"><el-tab-pane label="状态历史"><el-timeline><el-timeline-item v-for="item in transitions" :key="item.id" :timestamp="item.createdAt">{{ item.fromStatus }} → {{ item.toStatus }} · {{ item.action }}<p>{{ item.remark }}</p></el-timeline-item></el-timeline></el-tab-pane>
           <el-tab-pane label="分派历史"><el-timeline><el-timeline-item v-for="item in assignments" :key="item.id" :timestamp="item.createdAt">部门 {{ item.fromDepartmentId ?? '-' }} → {{ item.toDepartmentId }}，处理人 {{ item.toAssigneeId ?? '未指定' }}</el-timeline-item></el-timeline></el-tab-pane>
-          <el-tab-pane label="评论"><div v-for="item in comments" :key="item.id" class="comment-item"><strong>用户 #{{ item.authorId }} · {{ item.visibility }}</strong><p>{{ item.content }}</p><small>{{ item.createdAt }}</small></div></el-tab-pane><el-tab-pane label="知识关联"><el-button v-if="auth.hasAuthority('knowledge:write') || auth.hasAuthority('knowledge:manage')" @click="openKnowledgeLink">关联知识</el-button><div v-for="item in knowledgeArticles" :key="item.id" class="comment-item"><strong>{{ item.title }}</strong><p>{{ item.summary || item.content }}</p><small>{{ item.visibility }} · {{ item.updatedAt }}</small></div></el-tab-pane></el-tabs>
+          <el-tab-pane label="评论"><div v-for="item in comments" :key="item.id" class="comment-item"><strong>用户 #{{ item.authorId }} · {{ item.visibility }}</strong><p>{{ item.content }}</p><small>{{ item.createdAt }}</small></div></el-tab-pane>
+          <el-tab-pane label="知识关联"><el-button v-if="auth.hasAuthority('knowledge:write') || auth.hasAuthority('knowledge:manage')" @click="openKnowledgeLink">关联知识</el-button><div v-for="item in knowledgeArticles" :key="item.id" class="comment-item"><strong>{{ item.title }}</strong><p>{{ item.summary || item.content }}</p><small>{{ item.visibility }} · {{ item.updatedAt }}</small></div></el-tab-pane>
+          <el-tab-pane label="✨ AI 推荐">
+            <el-empty v-if="recommendations.length === 0" description="暂无相关知识推荐" />
+            <div v-for="item in recommendations" :key="item.articleId" class="comment-item" style="border:1px solid #ebeef5; padding:12px; margin-bottom:12px; border-radius:6px; background:var(--bg-glass)">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong>{{ item.title }}</strong>
+                <el-tag v-if="item.feedbackStatus === 'ADOPTED'" type="success" size="small">已采用</el-tag>
+                <el-tag v-else-if="item.feedbackStatus === 'REJECTED'" type="info" size="small">已忽略</el-tag>
+                <div v-else>
+                  <el-button type="primary" link size="small" @click="handleFeedback(item.articleId, 'ADOPTED')">采用并关联</el-button>
+                  <el-button type="info" link size="small" @click="handleFeedback(item.articleId, 'REJECTED')">忽略</el-button>
+                </div>
+              </div>
+              <p style="color:#666; margin:8px 0; font-size:13px;">{{ item.summary || '无摘要' }}</p>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
       </template>
     </el-drawer>
 

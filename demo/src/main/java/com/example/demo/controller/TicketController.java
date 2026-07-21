@@ -6,6 +6,9 @@ import com.example.demo.converter.TicketConverter;
 import com.example.demo.dto.ticket.*;
 import com.example.demo.service.TicketService;
 import com.example.demo.service.KnowledgeService;
+import com.example.demo.service.KnowledgeRecommendationService;
+import com.example.demo.dto.knowledge.KnowledgeRecommendationDTO;
+import com.example.demo.dto.knowledge.KnowledgeRecommendationFeedbackRequest;
 import com.example.demo.security.TenantContext;
 import com.example.demo.vo.*;
 import jakarta.validation.Valid;
@@ -28,6 +31,7 @@ import java.util.List;
 public class TicketController {
     private final TicketService ticketService;
     private final KnowledgeService knowledgeService;
+    private final KnowledgeRecommendationService knowledgeRecommendationService;
     private final TenantContext tenantContext;
 
     /**
@@ -138,5 +142,20 @@ public class TicketController {
     @PreAuthorize("@ticketReadScope.canRead(#id)")
     public Result<List<KnowledgeArticleResponse>> knowledgeArticles(@PathVariable @Positive Long id) {
         return Result.success(knowledgeService.listVisibleArticlesForTicket(id).stream().map(com.example.demo.converter.KnowledgeConverter::toResponse).toList());
+    }
+
+    /** 智能推荐知识文章 */
+    @GetMapping("/{id}/recommendations")
+    @PreAuthorize("@ticketReadScope.canRead(#id)")
+    public Result<List<KnowledgeRecommendationDTO>> recommendations(@PathVariable @Positive Long id) {
+        return Result.success(knowledgeRecommendationService.recommendForTicket(id));
+    }
+
+    /** 反馈推荐文章是否有用 */
+    @PostMapping("/{id}/recommendations/{articleId}/feedback")
+    @PreAuthorize("@ticketReadScope.canRead(#id)")
+    public Result<Void> recommendationFeedback(@PathVariable @Positive Long id, @PathVariable @Positive Long articleId, @Valid @RequestBody KnowledgeRecommendationFeedbackRequest request) {
+        knowledgeRecommendationService.feedback(id, articleId, request);
+        return Result.success();
     }
 }

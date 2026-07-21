@@ -45,6 +45,14 @@ public class RabbitMqConfig {
                 .build();
     }
 
+    @Bean
+    Queue knowledgeQueue() {
+        return QueueBuilder.durable(RabbitTopology.KNOWLEDGE_QUEUE)
+                .deadLetterExchange(RabbitTopology.DEAD_LETTER_EXCHANGE)
+                .deadLetterRoutingKey(RabbitTopology.DEAD_LETTER_ROUTING_KEY)
+                .build();
+    }
+
     /**
      * @return 保存多次消费失败消息的持久化死信队列。
      */
@@ -63,6 +71,11 @@ public class RabbitMqConfig {
     @Bean
     Binding notificationBinding(Queue notificationQueue, TopicExchange flowOpsExchange) {
         return BindingBuilder.bind(notificationQueue).to(flowOpsExchange).with("ticket.#");
+    }
+
+    @Bean
+    Binding knowledgeBinding(Queue knowledgeQueue, TopicExchange flowOpsExchange) {
+        return BindingBuilder.bind(knowledgeQueue).to(flowOpsExchange).with("knowledge.article.#");
     }
 
     /**

@@ -1,0 +1,26 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${FLOWOPS_TEST_DB_URL}
+    username: ${FLOWOPS_TEST_DB_USERNAME}
+    password: ${FLOWOPS_TEST_DB_PASSWORD}
+  rabbitmq:
+    host: ${FLOWOPS_TEST_RABBITMQ_HOST:localhost}
+    port: ${FLOWOPS_TEST_RABBITMQ_PORT:5672}
+    username: ${FLOWOPS_TEST_RABBITMQ_USERNAME}
+    password: ${FLOWOPS_TEST_RABBITMQ_PASSWORD}
+    virtual-host: ${FLOWOPS_TEST_RABBITMQ_VHOST:flowops}
+
+flowops:
+  redis:
+    enabled: ${FLOWOPS_TEST_REDIS_ENABLED:false}
+  messaging:
+    enabled: ${FLOWOPS_TEST_MESSAGING_ENABLED:false}
+  sla:
+    enabled: false
+  security:
+    jwt:
+      secret: ${FLOWOPS_TEST_JWT_SECRET}
