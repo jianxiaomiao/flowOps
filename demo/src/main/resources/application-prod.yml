@@ -1,8 +1,27 @@
 server:
   servlet:
     context-path: /flowOps
-  port: 9090
+  port: 8080
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  rabbitmq:
+    host: ${FLOWOPS_RABBITMQ_HOST}
+    port: ${FLOWOPS_RABBITMQ_AMQP_PORT:5672}
+    username: ${FLOWOPS_RABBITMQ_USER}
+    password: ${FLOWOPS_RABBITMQ_PASSWORD}
+    virtual-host: ${FLOWOPS_RABBITMQ_VHOST:flowops}
 
 flowops:
+  security:
+    jwt:
+      secret: ${FLOWOPS_JWT_SECRET}
   registration:
     enabled: ${FLOWOPS_REGISTRATION_ENABLED:false}

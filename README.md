@@ -13,8 +13,9 @@ FlowOps 是一个面向企业内部协作的多租户工单流转平台。它把
 - 工单状态、分派和评论历史；
 - SLA 截止时间快照、扫描和原子幂等超时处理；
 - Transactional Outbox、RabbitMQ 重试/死信和通知消费幂等；
+- Redis 分布式登录/注册限流、通知未读数缓存和 JWT 撤销/会话版本；
 - 站内通知收件箱、操作日志和审计日志；
-- Vue 3 管理界面和 51/51 后端 HTTP 操作的类型安全接入；
+- Vue 3 管理界面和 53/53 后端 HTTP 操作的类型安全接入；
 - Postman 全流程 Collection 和后端自动化测试。
 
 ## 技术栈
@@ -25,10 +26,11 @@ FlowOps 是一个面向企业内部协作的多租户工单流转平台。它把
 | 安全 | Spring Security、JWT、BCrypt | 无状态认证、方法级授权和密码摘要 |
 | 持久化 | MySQL 8、MyBatis-Plus 3.5 | 多租户业务数据、分页、自动填充和乐观锁 |
 | 消息 | RabbitMQ、Spring AMQP | 异步通知、重试和死信处理；可通过功能开关关闭 |
-| 缓存 | Spring Data Redis | 依赖已预留，业务接入尚处于规划阶段 |
+| 缓存 | Redis、Spring Data Redis、Lettuce | 分布式限流、未读数 Cache Aside、Token 撤销和带 TTL 共享状态 |
 | 前端 | Vue 3、TypeScript、Vite | SPA 页面、类型安全和开发代理 |
 | 前端生态 | Vue Router、Pinia、Axios、Element Plus | 权限路由、登录状态、HTTP 封装和业务组件 |
-| 测试 | JUnit 5、Mockito、Spring Boot Test、Postman | 领域规则、认证、消息幂等和接口闭环验证 |
+| 数据库迁移 | Flyway | 版本化建表、权限种子和现有数据库 baseline |
+| 测试 | JUnit 5、Mockito、Spring Boot Test、Postman、Playwright | 领域规则、认证、消息幂等、接口和浏览器闭环验证 |
 | 本地基础设施 | Docker Compose | 启动并持久化 RabbitMQ |
 
 ## 核心设计理念
@@ -200,13 +202,14 @@ npm run build
 - [HTTP API 契约](docs/06-api-contract.md)
 - [前端 API 接入清单](docs/09-frontend-api-integration.md)
 - [Redis 接入计划](docs/10-redis-integration-plan.md)
+- [Playwright 与 Flyway 验证](docs/11-playwright-flyway-verification.md)
+- [Docker 与配置分层指南](docs/12-docker-configuration-guide.md)
 - [架构决策记录](docs/adr/)
 
 ## 当前边界与后续方向
 
-- 完整数据库结构还需要整理为正式版本化迁移脚本；
-- 公开企业注册在生产环境需要验证码、邮箱验证、限流和审核；
-- Redis 业务能力尚未落地，下一阶段优先实现认证限流和通知未读计数；
+- 数据库结构已通过 Flyway V1/V2 纳入版本化迁移；后续任何变更必须新增 V3+ 脚本，并在临时库和已有库上演练升级与恢复；
+- 公开企业注册已有分布式限流，生产环境仍需要验证码、邮箱验证和审核；
+- Redis 安全状态当前以 Redis 持久化能力为前提；生产环境应启用 AOF/持久卷，并评估将会话版本持久化到 MySQL；
 - 前端仍可继续补充关联对象名称、表单细节和端到端自动化测试；
 - 当前保持模块化单体，在业务边界稳定前不拆微服务。
-

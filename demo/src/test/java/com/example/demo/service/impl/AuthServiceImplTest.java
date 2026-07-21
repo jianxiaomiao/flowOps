@@ -8,6 +8,7 @@ import com.example.demo.entity.UserAccount;
 import com.example.demo.mapper.RolePermissionMapper;
 import com.example.demo.mapper.TenantMapper;
 import com.example.demo.mapper.UserAccountMapper;
+import com.example.demo.security.TokenSessionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -31,6 +32,7 @@ class AuthServiceImplTest {
     @Mock RolePermissionMapper rolePermissionMapper;
     @Mock PasswordEncoder passwordEncoder;
     @Mock JwtEncoder jwtEncoder;
+    @Mock TokenSessionService tokenSessionService;
 
     @Test
     void shouldIssueTokenWithTrustedIdentityAndAuthorities() {
@@ -45,7 +47,7 @@ class AuthServiceImplTest {
         when(jwtEncoder.encode(any())).thenReturn(encoded);
 
         AuthServiceImpl service = new AuthServiceImpl(tenantMapper, userAccountMapper, rolePermissionMapper,
-                passwordEncoder, jwtEncoder, new JwtProperties("flowops", Duration.ofMinutes(30), "unused"));
+                passwordEncoder, jwtEncoder, new JwtProperties("flowops", Duration.ofMinutes(30), "unused"), tokenSessionService);
         var response = service.login(new LoginRequest("ACME", "ADMIN", "password123"));
 
         assertEquals("signed-token", response.accessToken());
@@ -53,6 +55,8 @@ class AuthServiceImplTest {
         verify(jwtEncoder).encode(captor.capture());
         assertEquals(Long.valueOf(1L), captor.getValue().getClaims().getClaim("tenant_id"));
         assertEquals(Long.valueOf(9L), captor.getValue().getClaims().getClaim("user_id"));
+        assertNotNull(captor.getValue().getClaims().getId());
+        assertEquals(Long.valueOf(0L), captor.getValue().getClaims().getClaim("session_version"));
         assertEquals(List.of("ticket:create", "role:manage"), captor.getValue().getClaims().getClaim("authorities"));
     }
 
@@ -60,7 +64,7 @@ class AuthServiceImplTest {
     void shouldNotRevealWhetherTenantOrUserExists() {
         when(tenantMapper.selectOne(any())).thenReturn(null);
         AuthServiceImpl service = new AuthServiceImpl(tenantMapper, userAccountMapper, rolePermissionMapper,
-                passwordEncoder, jwtEncoder, new JwtProperties("flowops", Duration.ofMinutes(30), "unused"));
+                passwordEncoder, jwtEncoder, new JwtProperties("flowops", Duration.ofMinutes(30), "unused"), tokenSessionService);
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.login(new LoginRequest("UNKNOWN", "nobody", "password123")));
@@ -130,7 +134,7 @@ class AuthServiceImplTest {
 
     private AuthServiceImpl service() {
         return new AuthServiceImpl(tenantMapper, userAccountMapper, rolePermissionMapper,
-                passwordEncoder, jwtEncoder, new JwtProperties("flowops", Duration.ofMinutes(30), "unused"));
+                passwordEncoder, jwtEncoder, new JwtProperties("flowops", Duration.ofMinutes(30), "unused"), tokenSessionService);
     }
 
     private Tenant activeTenant() {

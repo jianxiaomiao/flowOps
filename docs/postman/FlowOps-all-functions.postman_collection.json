@@ -1,0 +1,437 @@
+{
+  "info": {
+    "_postman_id": "f8bb98c5-f06a-4f74-a0a5-flowops-all",
+    "name": "FlowOps - 全功能测试",
+    "description": "按文件夹编号顺序执行。默认管理员使用 adminToken，处理人请求单独使用 agentToken。运行前先执行 docs/sql/03-postman-test-fixtures.sql。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{adminToken}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "00 - 认证与安全",
+      "item": [
+        {
+          "name": "00.1 不带 Token 应返回 401",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "const suffix = Date.now().toString();",
+              "pm.environment.set('runSuffix', suffix);",
+              "pm.environment.set('agentUsername', 'postman_agent_' + suffix);",
+              "pm.environment.set('disabledUsername', 'postman_disabled_' + suffix);"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+              "pm.test('业务码 10002', () => pm.expect(pm.response.json().code).to.eql(10002));"
+            ] } }
+          ],
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "header": [], "url": "{{baseUrl}}/ticket/page?pageNum=1&pageSize=10" }
+        },
+        {
+          "name": "00.2 错误密码应返回 401",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('错误凭据返回 401', () => pm.response.to.have.status(401));",
+            "pm.test('不泄露具体原因', () => pm.expect(pm.response.json().code).to.eql(10002));"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" }, "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tenantCode\": \"{{tenantCode}}\",\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"wrong-password\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "00.2.1 重复企业编码注册应返回 409",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('重复企业编码返回 409', () => pm.response.to.have.status(409));",
+            "pm.test('业务码 30001', () => pm.expect(pm.response.json().code).to.eql(30001));"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" }, "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tenantCode\": \"{{tenantCode}}\",\n  \"tenantName\": \"重复注册测试\",\n  \"adminUsername\": \"admin\",\n  \"adminPassword\": \"Password@123\",\n  \"adminDisplayName\": \"测试管理员\",\n  \"adminEmail\": \"register@example.com\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "00.3 管理员登录并保存 Token",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('登录成功', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().code).to.eql(0); });",
+            "pm.test('traceId 原样返回', () => pm.expect(pm.response.headers.get('X-Trace-Id')).to.eql('postman-admin-login'));",
+            "const json = pm.response.json();",
+            "if (json.code === 0) pm.environment.set('adminToken', json.data.accessToken);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" }, "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "postman-admin-login" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tenantCode\": \"{{tenantCode}}\",\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "00.4 获取当前用户与权限",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('当前用户查询成功', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().code).to.eql(0); });",
+            "pm.test('身份与租户来自可信 Token', () => { const data = pm.response.json().data; pm.expect(data.userId).to.be.a('number'); pm.expect(data.tenantId).to.be.a('number'); pm.expect(data.username).to.eql(pm.environment.get('adminUsername').trim().toLowerCase()); });",
+            "pm.test('管理员权限已恢复', () => { const authorities = pm.response.json().data.authorities; pm.expect(authorities).to.include('user:manage'); pm.expect(authorities).to.include('role:manage'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/auth/me" }
+        },
+        {
+          "name": "00.5 查询权限字典",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('查询成功', () => pm.expect(pm.response.json().code).to.eql(0));"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/permission/page?pageNum=1&pageSize=100&status=ACTIVE" }
+        }
+      ]
+    },
+    {
+      "name": "01 - 部门 CRUD",
+      "item": [
+        {
+          "name": "01.1 创建测试部门",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('创建成功', () => pm.expect(pm.response.json().code).to.eql(0));",
+            "if (pm.response.json().code === 0) pm.environment.set('tempDepartmentId', pm.response.json().data.id);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"parentId\": null,\n  \"departmentCode\": \"PM{{runSuffix}}\",\n  \"departmentName\": \"Postman 测试部门\",\n  \"sortOrder\": 90\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/department" }
+        },
+        {
+          "name": "01.2 修改测试部门",
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": {{tempDepartmentId}},\n  \"departmentName\": \"Postman 测试部门（已修改）\",\n  \"sortOrder\": 91\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/department" }
+        },
+        { "name": "01.3 查询单个部门", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/department/{{tempDepartmentId}}" } },
+        { "name": "01.4 部门分页与筛选", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/department/page?pageNum=1&pageSize=10&departmentName=Postman&status=ACTIVE" } },
+        { "name": "01.5 部门列表", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/department" } },
+        { "name": "01.6 停用测试部门", "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/department/{{tempDepartmentId}}" } },
+        { "name": "01.7 重新启用测试部门", "request": { "method": "PUT", "header": [], "url": "{{baseUrl}}/department/{{tempDepartmentId}}/enable" } }
+      ]
+    },
+    {
+      "name": "02 - 用户账号",
+      "item": [
+        {
+          "name": "02.1 创建工单处理人",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('创建处理人成功', () => pm.expect(pm.response.json().code).to.eql(0));",
+            "if (pm.response.json().code === 0) pm.environment.set('agentUserId', pm.response.json().data.id);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"departmentId\": {{techDepartmentId}},\n  \"username\": \"{{agentUsername}}\",\n  \"rawPassword\": \"{{agentPassword}}\",\n  \"displayName\": \"Postman 一线处理人\",\n  \"email\": \"agent.{{runSuffix}}@example.com\",\n  \"phone\": \"13900000001\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/user-account" }
+        },
+        {
+          "name": "02.2 更新处理人资料",
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": {{agentUserId}},\n  \"departmentId\": {{techDepartmentId}},\n  \"displayName\": \"Postman 高级处理人\",\n  \"email\": \"agent.updated.{{runSuffix}}@example.com\",\n  \"phone\": \"13900000002\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/user-account" }
+        },
+        { "name": "02.3 查询单个用户", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/user-account/{{agentUserId}}" } },
+        { "name": "02.4 用户分页", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/user-account/page?pageNum=1&pageSize=10&username=postman_agent&status=ACTIVE" } },
+        {
+          "name": "02.5 创建待停用用户",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.json().code === 0) pm.environment.set('disabledUserId', pm.response.json().data.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"departmentId\": {{techDepartmentId}},\n  \"username\": \"{{disabledUsername}}\",\n  \"rawPassword\": \"Disabled@123456\",\n  \"displayName\": \"待停用用户\",\n  \"email\": \"disabled.{{runSuffix}}@example.com\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/user-account" }
+        },
+        { "name": "02.6 停用用户", "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/user-account/{{disabledUserId}}" } },
+        {
+          "name": "02.7 停用用户不能登录",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('停用账号返回 401', () => pm.response.to.have.status(401));"] } }],
+          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tenantCode\": \"{{tenantCode}}\",\n  \"username\": \"{{disabledUsername}}\",\n  \"password\": \"Disabled@123456\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/auth/login" }
+        },
+        { "name": "02.8 重新启用用户", "request": { "method": "PUT", "header": [], "url": "{{baseUrl}}/user-account/{{disabledUserId}}/enable" } }
+      ]
+    },
+    {
+      "name": "03 - 角色与授权",
+      "item": [
+        {
+          "name": "03.1 创建临时角色",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.json().code === 0) pm.environment.set('tempRoleId', pm.response.json().data.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"roleCode\": \"PM_ROLE_{{runSuffix}}\",\n  \"roleName\": \"Postman 临时角色\",\n  \"description\": \"用于授权与撤权测试\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role" }
+        },
+        {
+          "name": "03.2 更新临时角色",
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": {{tempRoleId}},\n  \"roleName\": \"Postman 临时角色（已修改）\",\n  \"description\": \"修改测试完成\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role" }
+        },
+        { "name": "03.3 查询单个角色", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/role/{{tempRoleId}}" } },
+        { "name": "03.3B 查询角色分页", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/role/page?pageNum=1&pageSize=20&status=ACTIVE" } },
+        {
+          "name": "03.4 给临时角色授予查看本人权限",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"roleId\": {{tempRoleId}},\n  \"permissionId\": 2\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role-permission" }
+        },
+        { "name": "03.5 查询角色权限", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/role-permission?roleId={{tempRoleId}}" } },
+        {
+          "name": "03.6 重复授予应返回 409",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('重复授权返回 409', () => pm.response.to.have.status(409));"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"roleId\": {{tempRoleId}},\n  \"permissionId\": 2\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role-permission" }
+        },
+        {
+          "name": "03.7 租户角色不能获得 PLATFORM 权限",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('平台权限被拒绝', () => pm.response.to.have.status(403));"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"roleId\": {{tempRoleId}},\n  \"permissionId\": 13\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role-permission" }
+        },
+        {
+          "name": "03.8 临时角色授予处理人",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{agentUserId}},\n  \"roleId\": {{tempRoleId}}\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/user-role" }
+        },
+        { "name": "03.9 查询用户角色", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/user-role?userId={{agentUserId}}" } },
+        { "name": "03.10 撤销临时角色", "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/user-role?userId={{agentUserId}}&roleId={{tempRoleId}}" } },
+        { "name": "03.11 撤销临时角色权限", "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/role-permission?roleId={{tempRoleId}}&permissionId=2" } },
+        { "name": "03.12 停用临时角色", "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/role/{{tempRoleId}}" } },
+        { "name": "03.12.1 重新启用临时角色", "request": { "method": "PUT", "header": [], "url": "{{baseUrl}}/role/{{tempRoleId}}/enable" } },
+        {
+          "name": "03.13 内置角色不能修改",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('内置角色修改返回 409', () => pm.response.to.have.status(409));"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": 2,\n  \"roleName\": \"不允许修改\",\n  \"description\": \"非法操作测试\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role" }
+        },
+        {
+          "name": "03.14 为 TICKET_AGENT 授予处理权限",
+          "description": "依次授予 permissionId 3、5、6、7；首次运行应成功，重复运行可能返回 409。",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"roleId\": {{agentRoleId}},\n  \"permissionId\": 3\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role-permission" }
+        },
+        { "name": "03.15 授予接单权限", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"roleId\": {{agentRoleId}},\n  \"permissionId\": 5\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role-permission" } },
+        { "name": "03.16 授予处理权限", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"roleId\": {{agentRoleId}},\n  \"permissionId\": 6\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role-permission" } },
+        { "name": "03.17 授予解决权限", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"roleId\": {{agentRoleId}},\n  \"permissionId\": 7\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/role-permission" } },
+        {
+          "name": "03.18 给处理人授予 TICKET_AGENT",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{agentUserId}},\n  \"roleId\": {{agentRoleId}}\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/user-role" }
+        },
+        {
+          "name": "03.19 处理人登录并保存 Token",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('处理人登录成功', () => pm.expect(pm.response.json().code).to.eql(0));",
+            "if (pm.response.json().code === 0) pm.environment.set('agentToken', pm.response.json().data.accessToken);"
+          ] } }],
+          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tenantCode\": \"{{tenantCode}}\",\n  \"username\": \"{{agentUsername}}\",\n  \"password\": \"{{agentPassword}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/auth/login" }
+        },
+        {
+          "name": "03.20 处理人不能管理角色",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('无权限返回 403', () => pm.response.to.have.status(403));"] } }],
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{agentToken}}", "type": "string" }] }, "method": "GET", "header": [], "url": "{{baseUrl}}/role/page?pageNum=1&pageSize=10" }
+        }
+      ]
+    },
+    {
+      "name": "04 - SLA 策略",
+      "item": [
+        {
+          "name": "04.1 创建 P0 策略",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const json = pm.response.json(); if (json.code === 0) { pm.environment.set('p0PolicyId', json.data.id); pm.environment.set('p0PolicyVersion', json.data.version || 0); }"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"policyName\": \"Postman P0\",\n  \"priority\": \"P0\",\n  \"responseMinutes\": 15,\n  \"resolutionMinutes\": 120\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/sla-policy" }
+        },
+        { "name": "04.2 查询 P0", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sla-policy/{{p0PolicyId}}" } },
+        {
+          "name": "04.3 更新 P0",
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": {{p0PolicyId}},\n  \"policyName\": \"Postman P0 更新版\",\n  \"responseMinutes\": 10,\n  \"resolutionMinutes\": 90,\n  \"enabled\": true,\n  \"version\": {{p0PolicyVersion}}\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/sla-policy" }
+        },
+        { "name": "04.4 SLA 分页", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/sla-policy/page?pageNum=1&pageSize=10&enabled=true" } },
+        {
+          "name": "04.5 重复创建 P1 应返回 409",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('重复优先级返回 409', () => pm.response.to.have.status(409));"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"policyName\": \"重复 P1\",\n  \"priority\": \"P1\",\n  \"responseMinutes\": 30,\n  \"resolutionMinutes\": 240\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/sla-policy" }
+        }
+      ]
+    },
+    {
+      "name": "05 - 工单完整状态机",
+      "item": [
+        {
+          "name": "05.1 管理员创建 P1 工单",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const json = pm.response.json();",
+            "pm.test('工单创建成功且初始状态 OPEN', () => { pm.expect(json.code).to.eql(0); pm.expect(json.data.status).to.eql('OPEN'); });",
+            "if (json.code === 0) { pm.environment.set('ticketId', json.data.id); pm.environment.set('ticketVersion', json.data.version); }"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "postman-ticket-flow" }],
+            "body": { "mode": "raw", "raw": "{\n  \"handlingDepartmentId\": {{techDepartmentId}},\n  \"title\": \"Postman VPN 无法连接 {{runSuffix}}\",\n  \"description\": \"客户端提示连接超时，需要技术部协助处理。\",\n  \"ticketType\": \"INCIDENT\",\n  \"priority\": \"P1\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket" }
+        },
+        { "name": "05.2 查询工单详情", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/ticket/{{ticketId}}" } },
+        { "name": "05.3 工单分页筛选", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/ticket/page?pageNum=1&pageSize=10&status=OPEN&priority=P1&title=Postman" } },
+        {
+          "name": "05.4 管理员分派给处理人",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const json = pm.response.json(); pm.test('状态变为 ASSIGNED', () => pm.expect(json.data.status).to.eql('ASSIGNED')); if (json.code === 0) pm.environment.set('ticketVersion', json.data.version);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"toDepartmentId\": {{techDepartmentId}},\n  \"toAssigneeId\": {{agentUserId}},\n  \"reason\": \"分派给 Postman 一线处理人\",\n  \"version\": {{ticketVersion}}\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/assignments" }
+        },
+        {
+          "name": "05.5 非处理人接单应返回 409",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('非处理人被拒绝', () => pm.response.to.have.status(409));"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"ACCEPT\",\n  \"version\": {{ticketVersion}},\n  \"remark\": \"管理员错误尝试接单\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        {
+          "name": "05.6 旧版本接单应返回 409",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('旧版本被拒绝', () => pm.response.to.have.status(409));"] } }],
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{agentToken}}", "type": "string" }] }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"ACCEPT\",\n  \"version\": 0,\n  \"remark\": \"故意使用旧版本\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        {
+          "name": "05.7 处理人接单",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json=pm.response.json(); pm.test('ACCEPTED',()=>pm.expect(json.data.status).to.eql('ACCEPTED')); if(json.code===0)pm.environment.set('ticketVersion',json.data.version);"] } }],
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{agentToken}}", "type": "string" }] }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"ACCEPT\",\n  \"version\": {{ticketVersion}},\n  \"remark\": \"已接单，开始排查\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        {
+          "name": "05.8 开始处理",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json=pm.response.json(); if(json.code===0)pm.environment.set('ticketVersion',json.data.version);"] } }],
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{agentToken}}", "type": "string" }] }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"START_PROCESS\",\n  \"version\": {{ticketVersion}},\n  \"remark\": \"正在检查 VPN 网关日志\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        {
+          "name": "05.9 添加处理评论",
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{agentToken}}", "type": "string" }] }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"已定位到用户证书过期，正在更新证书。\",\n  \"visibility\": \"INTERNAL\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/comments" }
+        },
+        {
+          "name": "05.10 提交解决方案",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json=pm.response.json(); pm.test('待创建人确认',()=>pm.expect(json.data.status).to.eql('PENDING_CONFIRMATION')); if(json.code===0)pm.environment.set('ticketVersion',json.data.version);"] } }],
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{agentToken}}", "type": "string" }] }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"SUBMIT_RESOLUTION\",\n  \"version\": {{ticketVersion}},\n  \"remark\": \"证书已更新\",\n  \"resolution\": \"重新签发 VPN 用户证书并清理客户端旧缓存。\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        {
+          "name": "05.11 处理人无权确认应返回 403",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('处理人确认被 RBAC 拒绝', () => pm.response.to.have.status(403));"] } }],
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{agentToken}}", "type": "string" }] }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"CONFIRM\",\n  \"version\": {{ticketVersion}},\n  \"remark\": \"处理人不能替创建人确认\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        {
+          "name": "05.12 创建人驳回方案",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json=pm.response.json(); pm.test('驳回后回到 PROCESSING',()=>pm.expect(json.data.status).to.eql('PROCESSING')); if(json.code===0)pm.environment.set('ticketVersion',json.data.version);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"REJECT\",\n  \"version\": {{ticketVersion}},\n  \"remark\": \"客户端仍有缓存，请继续处理\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        {
+          "name": "05.13 处理人重新提交方案",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json=pm.response.json(); if(json.code===0)pm.environment.set('ticketVersion',json.data.version);"] } }],
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{agentToken}}", "type": "string" }] }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"SUBMIT_RESOLUTION\",\n  \"version\": {{ticketVersion}},\n  \"remark\": \"已补充清理客户端缓存步骤\",\n  \"resolution\": \"重新签发证书、清理客户端缓存并重新导入配置。\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        {
+          "name": "05.14 创建人确认解决",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json=pm.response.json(); if(json.code===0)pm.environment.set('ticketVersion',json.data.version);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"CONFIRM\",\n  \"version\": {{ticketVersion}},\n  \"remark\": \"已验证 VPN 恢复正常\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        {
+          "name": "05.15 创建人关闭工单",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json=pm.response.json(); pm.test('最终 CLOSED',()=>pm.expect(json.data.status).to.eql('CLOSED')); if(json.code===0)pm.environment.set('ticketVersion',json.data.version);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"CLOSE\",\n  \"version\": {{ticketVersion}},\n  \"remark\": \"测试流程完成，关闭工单\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" }
+        },
+        { "name": "05.16 查看状态历史", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/ticket/{{ticketId}}/transitions" } },
+        { "name": "05.17 查看分派历史", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/ticket/{{ticketId}}/assignments" } },
+        { "name": "05.18 查看评论", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/ticket/{{ticketId}}/comments" } }
+      ]
+    },
+    {
+      "name": "06 - 通知与审计验证",
+      "item": [
+        {
+          "name": "06.1 管理员通知分页",
+          "description": "只有 flowops.messaging.enabled=true 且 RabbitMQ 正常时才会出现通知。",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const json=pm.response.json(); const records=json.data&&json.data.records; if(records&&records.length)pm.environment.set('notificationId',records[0].id);"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/notification/page?pageNum=1&pageSize=20&unreadOnly=true" }
+        },
+        {
+          "name": "06.1.1 查询通知未读数量",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('未读数量查询成功', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().code).to.eql(0); });",
+            "pm.test('未读数量是非负整数', () => { const count = pm.response.json().data.unreadCount; pm.expect(count).to.be.a('number'); pm.expect(count).to.be.at.least(0); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/notification/unread-count" }
+        },
+        {
+          "name": "06.2 标记通知已读",
+          "description": "如果 notificationId 为空，说明 RabbitMQ 未开启或没有投递到管理员。",
+          "request": { "method": "PUT", "header": [], "url": "{{baseUrl}}/notification/{{notificationId}}/read" }
+        }
+      ]
+    },
+    {
+      "name": "07 - 平台权限边界",
+      "item": [
+        {
+          "name": "07.1 企业管理员不能访问平台租户管理",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('企业管理员访问租户平台接口返回 403', () => pm.response.to.have.status(403));"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/tenant/page?pageNum=1&pageSize=10" }
+        }
+      ]
+    },
+    {
+      "name": "08 - Redis 限流与 Token 撤销",
+      "item": [
+        {
+          "name": "08.1 随机账号连续失败后触发登录限流",
+          "description": "主请求是第 1 次，测试脚本再顺序发送 5 次；前 5 次应为 401，第 6 次应为 429/10004。账号包含 runSuffix，不影响真实用户。",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('第 1 次错误登录返回 401', () => pm.response.to.have.status(401));",
+            "const request = { url: pm.environment.get('baseUrl') + '/auth/login', method: 'POST', header: { 'Content-Type': 'application/json' }, body: { mode: 'raw', raw: JSON.stringify({ tenantCode: 'RATE_' + pm.environment.get('runSuffix'), username: 'rate_' + pm.environment.get('runSuffix'), password: 'WrongPassword@123' }) } };",
+            "const statuses = [pm.response.code];",
+            "function sendNext(attempt) { pm.sendRequest(request, (error, response) => { pm.expect(error).to.eql(null); statuses.push(response.code); if (attempt < 6) { sendNext(attempt + 1); } else { pm.test('前 5 次为 401，第 6 次为 429', () => { pm.expect(statuses.slice(0, 5)).to.eql([401, 401, 401, 401, 401]); pm.expect(statuses[5]).to.eql(429); pm.expect(response.json().code).to.eql(10004); }); } }); }",
+            "sendNext(2);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" }, "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tenantCode\": \"RATE_{{runSuffix}}\",\n  \"username\": \"rate_{{runSuffix}}\",\n  \"password\": \"WrongPassword@123\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "08.2 退出并撤销当前管理员 Token",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.environment.set('revokedAdminToken', pm.environment.get('adminToken'));"] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('退出成功', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().code).to.eql(0); });"] } }
+          ],
+          "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/auth/logout" }
+        },
+        {
+          "name": "08.3 被撤销 Token 再访问应返回 401",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('旧 Token 返回 401', () => pm.response.to.have.status(401));",
+            "pm.test('业务码 10002', () => pm.expect(pm.response.json().code).to.eql(10002));"
+          ] } }],
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{revokedAdminToken}}", "type": "string" }] }, "method": "GET", "header": [], "url": "{{baseUrl}}/auth/me" }
+        },
+        {
+          "name": "08.4 重新登录恢复管理员 Token",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('重新登录成功', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json(); if (json.code === 0) pm.environment.set('adminToken', json.data.accessToken);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" }, "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tenantCode\": \"{{tenantCode}}\",\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        }
+      ]
+    }
+  ]
+}
