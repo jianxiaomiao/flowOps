@@ -25,41 +25,62 @@ public class KnowledgeController {
 
     @GetMapping("/categories")
     @PreAuthorize("hasAnyAuthority('knowledge:read','knowledge:write','knowledge:manage')")
-    public Result<List<KnowledgeCategoryResponse>> categories() { return Result.success(knowledgeService.listCategories().stream().map(KnowledgeConverter::toResponse).toList()); }
+    public Result<List<KnowledgeCategoryResponse>> categories() {
+        return Result.success(knowledgeService.listCategories().stream().map(KnowledgeConverter::toResponse).toList());
+    }
 
     @PostMapping("/categories")
     @PreAuthorize("hasAuthority('knowledge:manage')")
-    public Result<KnowledgeCategoryResponse> createCategory(@Valid @RequestBody KnowledgeCategoryCreateRequest request) { return Result.success(KnowledgeConverter.toResponse(knowledgeService.createCategory(request))); }
+    public Result<KnowledgeCategoryResponse> createCategory(@Valid @RequestBody KnowledgeCategoryCreateRequest request) {
+        return Result.success(KnowledgeConverter.toResponse(knowledgeService.createCategory(request)));
+    }
 
     @PutMapping("/categories")
     @PreAuthorize("hasAuthority('knowledge:manage')")
-    public Result<KnowledgeCategoryResponse> updateCategory(@Valid @RequestBody KnowledgeCategoryUpdateRequest request) { return Result.success(KnowledgeConverter.toResponse(knowledgeService.updateCategory(request))); }
+    public Result<KnowledgeCategoryResponse> updateCategory(@Valid @RequestBody KnowledgeCategoryUpdateRequest request) {
+        return Result.success(KnowledgeConverter.toResponse(knowledgeService.updateCategory(request)));
+    }
 
     @GetMapping("/articles/page")
     @PreAuthorize("hasAnyAuthority('knowledge:read','knowledge:write','knowledge:manage')")
-    public Result<IPage<KnowledgeArticleResponse>> page(@Valid @ModelAttribute KnowledgeArticlePageQuery query) { return Result.success(knowledgeService.pageVisibleArticles(query).convert(KnowledgeConverter::toResponse)); }
+    public Result<IPage<KnowledgeArticleResponse>> page(@Valid @ModelAttribute KnowledgeArticlePageQuery query) {
+        return Result.success(knowledgeService.pageVisibleArticles(query).convert(KnowledgeConverter::toResponse));
+    }
 
     @GetMapping("/articles/{id}")
     @PreAuthorize("hasAnyAuthority('knowledge:read','knowledge:write','knowledge:manage')")
-    public Result<KnowledgeArticleResponse> get(@PathVariable @Positive Long id) { return Result.success(KnowledgeConverter.toResponse(knowledgeService.getVisibleArticle(id))); }
+    public Result<KnowledgeArticleResponse> get(@PathVariable @Positive Long id) {
+        return Result.success(KnowledgeConverter.toResponse(knowledgeService.getVisibleArticle(id)));
+    }
 
     @PostMapping("/articles")
     @PreAuthorize("hasAnyAuthority('knowledge:write','knowledge:manage')")
-    public Result<KnowledgeArticleResponse> createArticle(@Valid @RequestBody KnowledgeArticleCreateRequest request) { return Result.success(KnowledgeConverter.toResponse(knowledgeService.createArticle(request))); }
+    public Result<KnowledgeArticleResponse> createArticle(@Valid @RequestBody KnowledgeArticleCreateRequest request) {
+        return Result.success(KnowledgeConverter.toResponse(knowledgeService.createArticle(request)));
+    }
 
     @PutMapping("/articles")
     @PreAuthorize("hasAnyAuthority('knowledge:write','knowledge:manage')")
-    public Result<KnowledgeArticleResponse> updateArticle(@Valid @RequestBody KnowledgeArticleUpdateRequest request) { return Result.success(KnowledgeConverter.toResponse(knowledgeService.updateArticle(request))); }
+    public Result<KnowledgeArticleResponse> updateArticle(@Valid @RequestBody KnowledgeArticleUpdateRequest request) {
+        return Result.success(KnowledgeConverter.toResponse(knowledgeService.updateArticle(request)));
+    }
 
     @PostMapping("/articles/{id}/publish")
     @PreAuthorize("hasAnyAuthority('knowledge:write','knowledge:manage')")
-    public Result<KnowledgeArticleResponse> publish(@PathVariable @Positive Long id, @Valid @RequestBody KnowledgeArticleStateRequest request) { return Result.success(KnowledgeConverter.toResponse(knowledgeService.publishArticle(id, request))); }
+    public Result<KnowledgeArticleResponse> publish(@PathVariable @Positive Long id, @Valid @RequestBody KnowledgeArticleStateRequest request) {
+        return Result.success(KnowledgeConverter.toResponse(knowledgeService.publishArticle(id, request)));
+    }
 
     @PostMapping("/articles/{id}/archive")
     @PreAuthorize("hasAnyAuthority('knowledge:write','knowledge:manage')")
-    public Result<KnowledgeArticleResponse> archive(@PathVariable @Positive Long id, @Valid @RequestBody KnowledgeArticleStateRequest request) { return Result.success(KnowledgeConverter.toResponse(knowledgeService.archiveArticle(id, request))); }
+    public Result<KnowledgeArticleResponse> archive(@PathVariable @Positive Long id, @Valid @RequestBody KnowledgeArticleStateRequest request) {
+        return Result.success(KnowledgeConverter.toResponse(knowledgeService.archiveArticle(id, request)));
+    }
 
     @PostMapping("/articles/{articleId}/tickets/{ticketId}")
     @PreAuthorize("hasAnyAuthority('knowledge:write','knowledge:manage') and @ticketReadScope.canRead(#ticketId)")
-    public Result<Void> linkTicket(@PathVariable @Positive Long articleId, @PathVariable @Positive Long ticketId, @Valid @RequestBody KnowledgeArticleTicketCreateRequest request) { knowledgeService.linkTicket(articleId, ticketId, request); return Result.success(); }
+    public Result<Void> linkTicket(@PathVariable @Positive Long articleId, @PathVariable @Positive Long ticketId, @Valid @RequestBody KnowledgeArticleTicketCreateRequest request) {
+        knowledgeService.linkTicket(articleId, ticketId, request);
+        return Result.success();
+    }
 }

@@ -79,6 +79,9 @@ public class GlobalExceptionHandler {
         if (code == 10004) {
             return HttpStatus.TOO_MANY_REQUESTS;
         }
+        if (code >= 50000) {
+            return HttpStatus.SERVICE_UNAVAILABLE;
+        }
         if (code >= 30000 && code < 40000) {
             return HttpStatus.CONFLICT;
         }

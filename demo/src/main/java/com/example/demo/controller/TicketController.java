@@ -146,14 +146,14 @@ public class TicketController {
 
     /** 智能推荐知识文章 */
     @GetMapping("/{id}/recommendations")
-    @PreAuthorize("@ticketReadScope.canRead(#id)")
+    @PreAuthorize("@ticketReadScope.canRead(#id) and hasAnyAuthority('knowledge:read','knowledge:write','knowledge:manage')")
     public Result<List<KnowledgeRecommendationDTO>> recommendations(@PathVariable @Positive Long id) {
         return Result.success(knowledgeRecommendationService.recommendForTicket(id));
     }
 
     /** 反馈推荐文章是否有用 */
     @PostMapping("/{id}/recommendations/{articleId}/feedback")
-    @PreAuthorize("@ticketReadScope.canRead(#id)")
+    @PreAuthorize("@ticketReadScope.canRead(#id) and hasAnyAuthority('knowledge:read','knowledge:write','knowledge:manage')")
     public Result<Void> recommendationFeedback(@PathVariable @Positive Long id, @PathVariable @Positive Long articleId, @Valid @RequestBody KnowledgeRecommendationFeedbackRequest request) {
         knowledgeRecommendationService.feedback(id, articleId, request);
         return Result.success();

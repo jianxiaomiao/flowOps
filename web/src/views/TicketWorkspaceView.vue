@@ -10,7 +10,10 @@ import {
   fetchTicketRecommendations, submitRecommendationFeedback,
 } from '@/services/ticket'
 import { fetchKnowledgePage, linkKnowledgeArticleToTicket } from '@/services/knowledge'
+import { ApiError } from '@/services/http'
 import type { Department, KnowledgeArticle, TicketAction, TicketAssignmentRecord, TicketComment, TicketPreview, TicketStatus, TicketTransitionRecord, UserAccount, KnowledgeRecommendationDTO } from '@/types/api'
+
+type RecommendationState = 'idle' | 'loading' | 'success' | 'empty' | 'error'
 
 const auth = useAuthStore()
 const tickets = ref<TicketPreview[]>([])
@@ -36,6 +39,11 @@ const knowledgeLinkVisible = ref(false)
 const knowledgeKeyword = ref('')
 const knowledgeCandidates = ref<KnowledgeArticle[]>([])
 const recommendations = ref<KnowledgeRecommendationDTO[]>([])
+const activeDetailTab = ref('history')
+const recommendationState = ref<RecommendationState>('idle')
+const recommendationError = ref('')
+const recommendationElapsedMs = ref<number | null>(null)
+const recommendationFinishedAt = ref('')
 
 const createForm = reactive({ handlingDepartmentId: undefined as number | undefined, title: '', description: '', ticketType: 'INCIDENT', priority: 'P2' as 'P0' | 'P1' | 'P2' })
 const assignmentForm = reactive({ toDepartmentId: undefined as number | undefined, toAssigneeId: undefined as number | undefined, reason: '' })
@@ -46,6 +54,7 @@ const actionLabels: Record<TicketAction, string> = { ACCEPT: '接单', START_PRO
 const actionByStatus: Partial<Record<TicketStatus, TicketAction[]>> = { ASSIGNED: ['ACCEPT'], ACCEPTED: ['START_PROCESS'], PROCESSING: ['SUBMIT_RESOLUTION'], PENDING_CONFIRMATION: ['CONFIRM', 'REJECT'], RESOLVED: ['CLOSE'] }
 const actionAuthority: Record<TicketAction, string> = { ACCEPT: 'ticket:accept', START_PROCESS: 'ticket:update', SUBMIT_RESOLUTION: 'ticket:resolve', CONFIRM: 'ticket:confirm', REJECT: 'ticket:confirm', CLOSE: 'ticket:confirm' }
 const availableActions = computed(() => selected.value ? (actionByStatus[selected.value.status] ?? []).filter((action) => auth.hasAuthority(actionAuthority[action])) : [])
+const canUseKnowledgeRecommendations = computed(() => auth.hasAuthority('knowledge:read') || auth.hasAuthority('knowledge:write') || auth.hasAuthority('knowledge:manage'))
 
 async function loadTickets() {
   loading.value = true
@@ -70,9 +79,47 @@ async function submitCreate() {
 
 async function openDetail(row: TicketPreview) {
   detailVisible.value = true
+  activeDetailTab.value = 'history'
+  recommendations.value = []
+  recommendationState.value = 'idle'
+  recommendationError.value = ''
+  recommendationElapsedMs.value = null
+  recommendationFinishedAt.value = ''
   selected.value = await fetchTicket(row.id)
-  const [transitionRows, assignmentRows, commentRows, linkedArticles, recs] = await Promise.all([fetchTicketTransitions(row.id), fetchTicketAssignments(row.id), fetchTicketComments(row.id), fetchTicketKnowledgeArticles(row.id), fetchTicketRecommendations(row.id).catch(()=>[])])
-  transitions.value = transitionRows; assignments.value = assignmentRows; comments.value = commentRows; knowledgeArticles.value = linkedArticles; recommendations.value = recs as KnowledgeRecommendationDTO[]
+  const [transitionRows, assignmentRows, commentRows, linkedArticles] = await Promise.all([fetchTicketTransitions(row.id), fetchTicketAssignments(row.id), fetchTicketComments(row.id), fetchTicketKnowledgeArticles(row.id)])
+  transitions.value = transitionRows; assignments.value = assignmentRows; comments.value = commentRows; knowledgeArticles.value = linkedArticles
+}
+
+async function loadRecommendations() {
+  if (!selected.value || recommendationState.value === 'loading') return
+  const ticketId = selected.value.id
+  recommendationState.value = 'loading'
+  recommendationError.value = ''
+  recommendationElapsedMs.value = null
+  const startedAt = performance.now()
+  try {
+    const rows = await fetchTicketRecommendations(ticketId)
+    if (selected.value?.id !== ticketId) return
+    recommendations.value = rows
+    recommendationState.value = rows.length > 0 ? 'success' : 'empty'
+    recommendationFinishedAt.value = new Date().toLocaleTimeString()
+  } catch (error) {
+    if (selected.value?.id !== ticketId) return
+    recommendations.value = []
+    recommendationState.value = 'error'
+    const traceHint = error instanceof ApiError && error.traceId ? `（TraceId: ${error.traceId}）` : ''
+    recommendationError.value = `${error instanceof ApiError ? error.message : 'AI 推荐服务暂时不可用'}${traceHint}`
+  } finally {
+    if (selected.value?.id === ticketId) {
+      recommendationElapsedMs.value = Math.max(1, Math.round(performance.now() - startedAt))
+    }
+  }
+}
+
+async function handleDetailTabChange(name: string | number) {
+  if (name === 'ai-recommendations' && recommendationState.value === 'idle') {
+    await loadRecommendations()
+  }
 }
 
 async function submitAssignment() {
@@ -153,24 +200,36 @@ onMounted(async () => { await Promise.all([loadTickets(), loadOptions()]) })
     <el-drawer v-model="detailVisible" size="720px" :title="selected ? `${selected.ticketNo} · ${selected.title}` : '工单详情'">
       <template v-if="selected"><el-descriptions :column="2" border><el-descriptions-item label="状态">{{ statusLabels[selected.status] }}</el-descriptions-item><el-descriptions-item label="版本">{{ selected.version }}</el-descriptions-item><el-descriptions-item label="优先级">{{ selected.priority }}</el-descriptions-item><el-descriptions-item label="处理人">{{ selected.currentAssigneeId ?? '未分派' }}</el-descriptions-item><el-descriptions-item label="描述" :span="2">{{ selected.description }}</el-descriptions-item><el-descriptions-item v-if="selected.resolution" label="解决方案" :span="2">{{ selected.resolution }}</el-descriptions-item></el-descriptions>
         <div class="detail-actions"><el-button v-if="auth.hasAuthority('ticket:assign')" @click="assignmentVisible=true">分派</el-button><el-button v-for="action in availableActions" :key="action" type="primary" @click="executeAction(action)">{{ actionLabels[action] }}</el-button><el-button v-if="auth.hasAuthority('ticket:update')" @click="commentVisible=true">添加评论</el-button></div>
-        <el-tabs class="detail-tabs"><el-tab-pane label="状态历史"><el-timeline><el-timeline-item v-for="item in transitions" :key="item.id" :timestamp="item.createdAt">{{ item.fromStatus }} → {{ item.toStatus }} · {{ item.action }}<p>{{ item.remark }}</p></el-timeline-item></el-timeline></el-tab-pane>
-          <el-tab-pane label="分派历史"><el-timeline><el-timeline-item v-for="item in assignments" :key="item.id" :timestamp="item.createdAt">部门 {{ item.fromDepartmentId ?? '-' }} → {{ item.toDepartmentId }}，处理人 {{ item.toAssigneeId ?? '未指定' }}</el-timeline-item></el-timeline></el-tab-pane>
-          <el-tab-pane label="评论"><div v-for="item in comments" :key="item.id" class="comment-item"><strong>用户 #{{ item.authorId }} · {{ item.visibility }}</strong><p>{{ item.content }}</p><small>{{ item.createdAt }}</small></div></el-tab-pane>
-          <el-tab-pane label="知识关联"><el-button v-if="auth.hasAuthority('knowledge:write') || auth.hasAuthority('knowledge:manage')" @click="openKnowledgeLink">关联知识</el-button><div v-for="item in knowledgeArticles" :key="item.id" class="comment-item"><strong>{{ item.title }}</strong><p>{{ item.summary || item.content }}</p><small>{{ item.visibility }} · {{ item.updatedAt }}</small></div></el-tab-pane>
-          <el-tab-pane label="✨ AI 推荐">
-            <el-empty v-if="recommendations.length === 0" description="暂无相关知识推荐" />
-            <div v-for="item in recommendations" :key="item.articleId" class="comment-item" style="border:1px solid #ebeef5; padding:12px; margin-bottom:12px; border-radius:6px; background:var(--bg-glass)">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <strong>{{ item.title }}</strong>
-                <el-tag v-if="item.feedbackStatus === 'ADOPTED'" type="success" size="small">已采用</el-tag>
-                <el-tag v-else-if="item.feedbackStatus === 'REJECTED'" type="info" size="small">已忽略</el-tag>
-                <div v-else>
-                  <el-button type="primary" link size="small" @click="handleFeedback(item.articleId, 'ADOPTED')">采用并关联</el-button>
-                  <el-button type="info" link size="small" @click="handleFeedback(item.articleId, 'REJECTED')">忽略</el-button>
-                </div>
+        <el-tabs v-model="activeDetailTab" class="detail-tabs" @tab-change="handleDetailTabChange"><el-tab-pane label="状态历史" name="history"><el-timeline><el-timeline-item v-for="item in transitions" :key="item.id" :timestamp="item.createdAt">{{ item.fromStatus }} → {{ item.toStatus }} · {{ item.action }}<p>{{ item.remark }}</p></el-timeline-item></el-timeline></el-tab-pane>
+          <el-tab-pane label="分派历史" name="assignments"><el-timeline><el-timeline-item v-for="item in assignments" :key="item.id" :timestamp="item.createdAt">部门 {{ item.fromDepartmentId ?? '-' }} → {{ item.toDepartmentId }}，处理人 {{ item.toAssigneeId ?? '未指定' }}</el-timeline-item></el-timeline></el-tab-pane>
+          <el-tab-pane label="评论" name="comments"><div v-for="item in comments" :key="item.id" class="comment-item"><strong>用户 #{{ item.authorId }} · {{ item.visibility }}</strong><p>{{ item.content }}</p><small>{{ item.createdAt }}</small></div></el-tab-pane>
+          <el-tab-pane label="知识关联" name="knowledge"><el-button v-if="auth.hasAuthority('knowledge:write') || auth.hasAuthority('knowledge:manage')" @click="openKnowledgeLink">关联知识</el-button><div v-for="item in knowledgeArticles" :key="item.id" class="comment-item"><strong>{{ item.title }}</strong><p>{{ item.summary || item.content }}</p><small>{{ item.visibility }} · {{ item.updatedAt }}</small></div></el-tab-pane>
+          <el-tab-pane v-if="canUseKnowledgeRecommendations" label="✨ AI 推荐" name="ai-recommendations">
+            <section class="recommendation-panel" aria-live="polite">
+              <div class="recommendation-panel__header">
+                <div><strong>相关知识推荐</strong><p>进入本页签后才会根据当前工单标题和描述执行向量检索。</p></div>
+                <el-button type="primary" :loading="recommendationState === 'loading'" @click="loadRecommendations">{{ recommendationState === 'idle' ? '获取推荐' : '重新检索' }}</el-button>
               </div>
-              <p style="color:#666; margin:8px 0; font-size:13px;">{{ item.summary || '无摘要' }}</p>
-            </div>
+              <div v-if="recommendationState === 'idle'" class="recommendation-state">尚未检索。点击“获取推荐”开始查询。</div>
+              <div v-else-if="recommendationState === 'loading'" class="recommendation-state recommendation-state--loading">正在从当前租户可见知识中检索，请稍候…</div>
+              <div v-else-if="recommendationState === 'error'" class="recommendation-state recommendation-state--error"><strong>检索失败</strong><p>{{ recommendationError }}</p><el-button @click="loadRecommendations">重试</el-button></div>
+              <div v-else-if="recommendationState === 'empty'" class="recommendation-state"><strong>没有找到推荐</strong><p>向量检索已完成，但当前权限范围内没有相关知识。</p><small>耗时 {{ recommendationElapsedMs }} ms · {{ recommendationFinishedAt }}</small></div>
+              <template v-else>
+                <div class="recommendation-summary">找到 {{ recommendations.length }} 条推荐 · 耗时 {{ recommendationElapsedMs }} ms · {{ recommendationFinishedAt }}</div>
+                <div v-for="item in recommendations" :key="item.articleId" class="comment-item recommendation-card">
+                  <div class="recommendation-card__header">
+                    <strong>{{ item.title }}</strong>
+                    <el-tag v-if="item.feedbackStatus === 'ADOPTED'" type="success" size="small">已采用</el-tag>
+                    <el-tag v-else-if="item.feedbackStatus === 'REJECTED'" type="info" size="small">已忽略</el-tag>
+                    <div v-else class="recommendation-card__actions">
+                      <el-button type="primary" link size="small" @click="handleFeedback(item.articleId, 'ADOPTED')">采用并关联</el-button>
+                      <el-button type="info" link size="small" @click="handleFeedback(item.articleId, 'REJECTED')">忽略</el-button>
+                    </div>
+                  </div>
+                  <p>{{ item.summary || '无摘要' }}</p>
+                </div>
+              </template>
+            </section>
           </el-tab-pane>
         </el-tabs>
       </template>

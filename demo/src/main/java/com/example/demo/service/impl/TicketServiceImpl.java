@@ -132,25 +132,72 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
      * @throws BusinessException 当版本过期、状态不允许分派或处理人不属于目标部门时抛出。
      */
     public Ticket assignTicket(Long ticketId, TicketAssignmentRequest request) {
-        Long tenantId = tenantContext.tenantId(); Long operatorId = tenantContext.userId();
-        Ticket ticket = getTicket(tenantId, ticketId); assertVersion(ticket, request.getVersion());
-        requireActiveOperator(tenantId, operatorId); tenantScopeValidator.requireActiveDepartment(tenantId, request.getToDepartmentId());
+        Long tenantId = tenantContext.tenantId();
+        Long operatorId = tenantContext.userId();
+        Ticket ticket = getTicket(tenantId, ticketId);
+
+        assertVersion(ticket, request.getVersion());
+
+        requireActiveOperator(tenantId, operatorId);
+        
+        tenantScopeValidator.requireActiveDepartment(tenantId, request.getToDepartmentId());
+
         if (!(TicketStatus.OPEN.name().equals(ticket.getStatus()) || TicketStatus.ASSIGNED.name().equals(ticket.getStatus()))) throw new BusinessException(30001, "当前状态不能分派工单");
+        
         UserAccount assignee = null;
+
         if (request.getToAssigneeId() != null) {
             assignee = userAccountService.getUser(tenantId, request.getToAssigneeId());
             if (!ACTIVE.equals(assignee.getStatus()) || !request.getToDepartmentId().equals(assignee.getDepartmentId())) throw new BusinessException(30001, "处理人必须是目标部门中的启用用户");
         }
-        String fromStatus = ticket.getStatus(); Long fromDepartmentId = ticket.getHandlingDepartmentId(); Long fromAssigneeId = ticket.getCurrentAssigneeId();
-        ticket.setHandlingDepartmentId(request.getToDepartmentId()); ticket.setCurrentAssigneeId(request.getToAssigneeId()); ticket.setStatus(TicketStatus.ASSIGNED.name()); ticket.setUpdatedBy(operatorId);
+
+        String fromStatus = ticket.getStatus();
+        
+        Long fromDepartmentId = ticket.getHandlingDepartmentId();
+        
+        Long fromAssigneeId = ticket.getCurrentAssigneeId();
+
+        ticket.setHandlingDepartmentId(request.getToDepartmentId());
+        
+        ticket.setCurrentAssigneeId(request.getToAssigneeId());
+        
+        ticket.setStatus(TicketStatus.ASSIGNED.name());
+        
+        ticket.setUpdatedBy(operatorId);
+
         updateTicket(ticket);
-        TicketAssignment assignment = new TicketAssignment(); assignment.setTenantId(ticket.getTenantId()); assignment.setTicketId(ticket.getId());
-        assignment.setAssignmentType(fromAssigneeId == null ? "ASSIGN" : "REASSIGN"); assignment.setFromDepartmentId(fromDepartmentId); assignment.setToDepartmentId(request.getToDepartmentId());
-        assignment.setFromAssigneeId(fromAssigneeId); assignment.setToAssigneeId(request.getToAssigneeId()); assignment.setAssignedBy(operatorId); assignment.setReason(request.getReason()); assignment.setTicketVersion(ticket.getVersion()); assignment.setCreatedAt(LocalDateTime.now());
+
+        TicketAssignment assignment = new TicketAssignment();
+
+        assignment.setTenantId(ticket.getTenantId());
+        
+        assignment.setTicketId(ticket.getId());
+
+        assignment.setAssignmentType(fromAssigneeId == null ? "ASSIGN" : "REASSIGN");
+        
+        assignment.setFromDepartmentId(fromDepartmentId);
+        
+        assignment.setToDepartmentId(request.getToDepartmentId());
+
+        assignment.setFromAssigneeId(fromAssigneeId); 
+        
+        assignment.setToAssigneeId(request.getToAssigneeId()); 
+        
+        assignment.setAssignedBy(operatorId); 
+        
+        assignment.setReason(request.getReason()); 
+        
+        assignment.setTicketVersion(ticket.getVersion()); 
+        
+        assignment.setCreatedAt(LocalDateTime.now());
+
         assignmentMapper.insert(assignment);
-        if (!fromStatus.equals(ticket.getStatus())) writeTransition(ticket, TicketAction.ASSIGN, fromStatus, operatorId, request.getReason());
+        if (!fromStatus.equals(ticket.getStatus()))
+        writeTransition(ticket, TicketAction.ASSIGN, fromStatus, operatorId, request.getReason());
+
         outboxEventService.enqueueTicketEvent(ticket, "TICKET_ASSIGNED",
                 List.of(request.getToAssigneeId() == null ? ticket.getCreatorId() : request.getToAssigneeId()));
+
         return ticket;
     }
 
@@ -165,9 +212,21 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
      * @throws BusinessException 当动作不支持、状态不匹配、操作人不正确或版本冲突时抛出。
      */
     public Ticket transitionTicket(Long ticketId, TicketTransitionRequest request) {
-        Long tenantId = tenantContext.tenantId(); Long operatorId = tenantContext.userId();
-        Ticket ticket = getTicket(tenantId, ticketId); assertVersion(ticket, request.getVersion()); requireActiveOperator(tenantId, operatorId);
-        TicketAction action = parseAction(request.getAction()); String fromStatus = ticket.getStatus(); LocalDateTime now = LocalDateTime.now();
+        Long tenantId = tenantContext.tenantId(); 
+        Long operatorId = tenantContext.userId();
+
+        Ticket ticket = getTicket(tenantId, ticketId); 
+        
+        assertVersion(ticket, request.getVersion()); 
+        
+        requireActiveOperator(tenantId, operatorId);
+
+        TicketAction action = parseAction(request.getAction());
+
+        String fromStatus = ticket.getStatus(); 
+
+        LocalDateTime now = LocalDateTime.now();
+
         switch (action) {
             case ACCEPT -> { requireStatus(ticket, TicketStatus.ASSIGNED); requireAssignee(ticket, operatorId); ticket.setStatus(TicketStatus.ACCEPTED.name()); ticket.setFirstResponseAt(now); markResponseSla(ticket, now); }
             case START_PROCESS -> { requireStatus(ticket, TicketStatus.ACCEPTED); requireAssignee(ticket, operatorId); ticket.setStatus(TicketStatus.PROCESSING.name()); }
@@ -196,24 +255,50 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
      * @throws BusinessException 当评论人停用或可见性非法时抛出。
      */
     public TicketComment addComment(Long ticketId, TicketCommentCreateRequest request) {
-        Long tenantId = tenantContext.tenantId(); Long authorId = tenantContext.userId();
-        Ticket ticket = getTicket(tenantId, ticketId); UserAccount author = userAccountService.getUser(tenantId, authorId);
+        Long tenantId = tenantContext.tenantId(); 
+        
+        Long authorId = tenantContext.userId();
+
+        Ticket ticket = getTicket(tenantId, ticketId);
+
+        UserAccount author = userAccountService.getUser(tenantId, authorId);
+        
         if (!ACTIVE.equals(author.getStatus())) throw new BusinessException(30001, "已停用用户不能评论");
+        
         String visibility = request.getVisibility().trim().toUpperCase(Locale.ROOT);
+        
         if (!("PUBLIC".equals(visibility) || "INTERNAL".equals(visibility))) throw new BusinessException(10001, "visibility 仅支持 PUBLIC 或 INTERNAL");
+        
         TicketComment comment = new TicketComment(); comment.setTenantId(ticket.getTenantId()); comment.setTicketId(ticket.getId()); comment.setAuthorId(author.getId()); comment.setContent(request.getContent().trim()); comment.setVisibility(visibility); comment.setCreatedAt(LocalDateTime.now());
         if (commentMapper.insert(comment) != 1) throw new IllegalStateException("发表评论失败"); return comment;
     }
 
     @Override
     /** @param tenantId 租户 ID。@param ticketId 工单 ID。@return 按时间升序的状态流转历史。 */
-    public List<TicketTransition> listTransitions(Long tenantId, Long ticketId) { getTicket(tenantId, ticketId); return transitionMapper.selectList(Wrappers.lambdaQuery(TicketTransition.class).eq(TicketTransition::getTenantId, tenantId).eq(TicketTransition::getTicketId, ticketId).orderByAsc(TicketTransition::getCreatedAt)); }
+    public List<TicketTransition> listTransitions(Long tenantId, Long ticketId) {
+         getTicket(tenantId, ticketId);
+        return transitionMapper.selectList(Wrappers.lambdaQuery(TicketTransition.class)
+        .eq(TicketTransition::getTenantId, tenantId)
+        .eq(TicketTransition::getTicketId, ticketId)
+        .orderByAsc(TicketTransition::getCreatedAt)); }
+
     @Override
     /** @param tenantId 租户 ID。@param ticketId 工单 ID。@return 按时间升序的分派历史。 */
-    public List<TicketAssignment> listAssignments(Long tenantId, Long ticketId) { getTicket(tenantId, ticketId); return assignmentMapper.selectList(Wrappers.lambdaQuery(TicketAssignment.class).eq(TicketAssignment::getTenantId, tenantId).eq(TicketAssignment::getTicketId, ticketId).orderByAsc(TicketAssignment::getCreatedAt)); }
+    public List<TicketAssignment> listAssignments(Long tenantId, Long ticketId) { 
+        getTicket(tenantId, ticketId); 
+        return assignmentMapper.selectList(Wrappers.lambdaQuery(TicketAssignment.class)
+        .eq(TicketAssignment::getTenantId, tenantId)
+        .eq(TicketAssignment::getTicketId, ticketId)
+        .orderByAsc(TicketAssignment::getCreatedAt)); }
+        
     @Override
     /** @param tenantId 租户 ID。@param ticketId 工单 ID。@return 按时间升序的评论列表。 */
-    public List<TicketComment> listComments(Long tenantId, Long ticketId) { getTicket(tenantId, ticketId); return commentMapper.selectList(Wrappers.lambdaQuery(TicketComment.class).eq(TicketComment::getTenantId, tenantId).eq(TicketComment::getTicketId, ticketId).orderByAsc(TicketComment::getCreatedAt)); }
+    public List<TicketComment> listComments(Long tenantId, Long ticketId) {
+        getTicket(tenantId, ticketId); 
+        return commentMapper.selectList(Wrappers.lambdaQuery(TicketComment.class)
+        .eq(TicketComment::getTenantId, tenantId)
+        .eq(TicketComment::getTicketId, ticketId)
+        .orderByAsc(TicketComment::getCreatedAt)); }
 
     /**
      * 通过 MyBatis-Plus 的版本字段更新工单。

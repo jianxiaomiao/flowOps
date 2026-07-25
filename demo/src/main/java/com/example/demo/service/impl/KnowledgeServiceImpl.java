@@ -47,9 +47,13 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeArticleMapper, Kn
 
     @Override @Transactional @AuditOperation(module = "KNOWLEDGE", operation = "CREATE_CATEGORY", resourceType = "KNOWLEDGE_CATEGORY")
     public KnowledgeCategory createCategory(KnowledgeCategoryCreateRequest request) {
-        Long tenantId = tenantContext.tenantId(); tenantScopeValidator.requireActiveTenant(tenantId);
+        Long tenantId = tenantContext.tenantId(); 
+        tenantScopeValidator.requireActiveTenant(tenantId);
         String code = normalizeCode(request.getCategoryCode());
-        if (categoryMapper.selectCount(Wrappers.lambdaQuery(KnowledgeCategory.class).eq(KnowledgeCategory::getTenantId, tenantId).eq(KnowledgeCategory::getCategoryCode, code)) > 0) throw new BusinessException(30001, "分类编码已存在");
+        if (categoryMapper.selectCount(Wrappers.lambdaQuery(KnowledgeCategory.class)
+        .eq(KnowledgeCategory::getTenantId, tenantId)
+        .eq(KnowledgeCategory::getCategoryCode, code))
+         > 0) throw new BusinessException(30001, "分类编码已存在");
         if (request.getParentId() != null) requireCategory(tenantId, request.getParentId());
         KnowledgeCategory category = KnowledgeConverter.toEntity(request);
         category.setTenantId(tenantId); category.setCategoryCode(code); category.setStatus(ACTIVE); category.setCreatedBy(tenantContext.userId()); category.setUpdatedBy(tenantContext.userId());
@@ -82,9 +86,17 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeArticleMapper, Kn
 
     @Override @Transactional @AuditOperation(module = "KNOWLEDGE", operation = "UPDATE_ARTICLE", resourceType = "KNOWLEDGE_ARTICLE")
     public KnowledgeArticle updateArticle(KnowledgeArticleUpdateRequest request) {
-        CurrentUser user = currentUserProvider.requireCurrentUser(); KnowledgeArticle article = requireArticle(user.tenantId(), request.getId()); requireCanEdit(user, article);
+        CurrentUser user = currentUserProvider.requireCurrentUser();
+        
+        KnowledgeArticle article = requireArticle(user.tenantId(), request.getId());
+        requireCanEdit(user, article);
         if ("ARCHIVED".equals(article.getStatus())) throw new BusinessException(30001, "已归档文章不能编辑");
-        requireCategory(user.tenantId(), request.getCategoryId()); applyArticleInput(article, request, user.tenantId()); article.setVersion(request.getVersion()); article.setUpdatedBy(user.userId());
+        
+        requireCategory(user.tenantId(), request.getCategoryId()); 
+        applyArticleInput(article, request, user.tenantId()); 
+        article.setVersion(request.getVersion()); 
+        article.setUpdatedBy(user.userId());
+
         if (!updateById(article)) throw new BusinessException(30002, "知识文章已被其他操作修改，请刷新后重试");
         
         if ("PUBLISHED".equals(article.getStatus())) {
@@ -95,7 +107,11 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeArticleMapper, Kn
     }
 
     @Override
-    public KnowledgeArticle getVisibleArticle(Long articleId) { KnowledgeArticle article = requireArticle(tenantContext.tenantId(), articleId); requireCanRead(currentUserProvider.requireCurrentUser(), article); return article; }
+    public KnowledgeArticle getVisibleArticle(Long articleId) {
+        KnowledgeArticle article = requireArticle(tenantContext.tenantId(), articleId);
+        requireCanRead(currentUserProvider.requireCurrentUser(), article); 
+        return article; 
+    }
 
     @Override
     public Page<KnowledgeArticle> pageVisibleArticles(KnowledgeArticlePageQuery query) {
@@ -105,9 +121,14 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeArticleMapper, Kn
 
     @Override @Transactional @AuditOperation(module = "KNOWLEDGE", operation = "PUBLISH_ARTICLE", resourceType = "KNOWLEDGE_ARTICLE")
     public KnowledgeArticle publishArticle(Long articleId, KnowledgeArticleStateRequest request) {
-        CurrentUser user = currentUserProvider.requireCurrentUser(); KnowledgeArticle article = requireArticle(user.tenantId(), articleId); requireCanEdit(user, article);
+        CurrentUser user = currentUserProvider.requireCurrentUser(); 
+        
+        KnowledgeArticle article = requireArticle(user.tenantId(), articleId); requireCanEdit(user, article);
+
         if (!"DRAFT".equals(article.getStatus())) throw new BusinessException(30001, "只有草稿可以发布");
+        
         article.setStatus("PUBLISHED"); article.setPublishedAt(LocalDateTime.now()); article.setVersion(request.getVersion()); article.setUpdatedBy(user.userId());
+        
         if (!updateById(article)) throw new BusinessException(30002, "知识文章已被其他操作修改，请刷新后重试");
         
         outboxEventService.enqueue(user.tenantId(), "KNOWLEDGE_ARTICLE", article.getId(), "KNOWLEDGE_ARTICLE_PUBLISHED", 

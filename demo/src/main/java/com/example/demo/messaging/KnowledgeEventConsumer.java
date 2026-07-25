@@ -10,6 +10,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -92,9 +93,14 @@ public class KnowledgeEventConsumer {
     private void deleteOldVectors(Long tenantId, Long articleId) {
         try {
             // 根据 Metadata 进行精确删除，查询所有当前 articleId 的块
-            SearchRequest request = SearchRequest.query("")
-                    .withFilterExpression("tenant_id == " + tenantId + " && article_id == " + articleId)
-                    .withTopK(1000);
+            FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
+            SearchRequest request = SearchRequest.builder()
+                    .query("")
+                    .filterExpression(filterBuilder.and(
+                            filterBuilder.eq("tenant_id", tenantId),
+                            filterBuilder.eq("article_id", articleId)).build())
+                    .topK(1000)
+                    .build();
             
             List<Document> oldDocs = vectorStore.similaritySearch(request);
             List<String> idsToDelete = oldDocs.stream().map(Document::getId).toList();

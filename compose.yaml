@@ -96,6 +96,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      milvus:
+        condition: service_healthy
 
   frontend:
     build:

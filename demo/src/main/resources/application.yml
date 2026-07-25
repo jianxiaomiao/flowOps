@@ -26,7 +26,8 @@ spring:
         client:
           host: ${FLOWOPS_MILVUS_HOST:localhost}
           port: ${FLOWOPS_MILVUS_PORT:19530}
-        index-name: knowledge_article_chunks
+        collection-name: knowledge_article_chunks
+        initialize-schema: true
         embedding-dimension: 2560
   rabbitmq:
     publisher-confirm-type: correlated

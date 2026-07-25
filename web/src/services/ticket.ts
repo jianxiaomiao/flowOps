@@ -3,7 +3,7 @@ import type {
   ApiResult, PageResult, TicketAssignmentRecord, TicketAssignmentRequest, TicketComment,
   TicketCommentCreateRequest, TicketCreateRequest, TicketPageQuery, TicketPreview,
   TicketTransitionRecord, TicketTransitionRequest,
-  KnowledgeArticle,
+  KnowledgeArticle, KnowledgeRecommendationDTO, KnowledgeRecommendationFeedbackRequest
 } from '@/types/api'
 
 export async function fetchTicketPage(query: TicketPageQuery) {
@@ -56,4 +56,14 @@ export async function fetchTicketComments(id: number) {
 export async function fetchTicketKnowledgeArticles(id: number) {
   const response = await http.get<ApiResult<KnowledgeArticle[]>>(`/ticket/${id}/knowledge-articles`)
   return response.data.data
+}
+
+export async function fetchTicketRecommendations(id: number) {
+  const response = await http.get<ApiResult<KnowledgeRecommendationDTO[]>>(`/ticket/${id}/recommendations`)
+  return response.data.data
+}
+
+export async function submitRecommendationFeedback(id: number, articleId: number, payload: KnowledgeRecommendationFeedbackRequest) {
+  const response = await http.post<ApiResult<void>>(`/ticket/${id}/recommendations/${articleId}/feedback`, payload)
+  return response.data
 }

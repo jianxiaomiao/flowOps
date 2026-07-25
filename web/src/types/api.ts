@@ -348,3 +348,15 @@ export interface KnowledgeArticlePayload {
   visibility: KnowledgeVisibility
   departmentId?: number
 }
+
+export interface KnowledgeRecommendationDTO {
+  articleId: number
+  title: string
+  summary: string | null
+  similarity: number
+  feedbackStatus: string | null
+}
+
+export interface KnowledgeRecommendationFeedbackRequest {
+  status: 'ADOPTED' | 'REJECTED'
+}
