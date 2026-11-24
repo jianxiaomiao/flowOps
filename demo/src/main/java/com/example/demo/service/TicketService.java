@@ -12,6 +12,9 @@ import java.util.List;
 public interface TicketService extends IService<Ticket> {
     /** @param request 创建数据。@return 新建工单。 */
     Ticket createTicket(TicketCreateRequest request);
+    Ticket createExternalTicket(Long tenantId, Long actorId, TicketCreateRequest request);
+    Page<Ticket> pageExternalQueue(int pageNum, int pageSize, boolean mine);
+    Ticket claimExternalTicket(Long ticketId, Integer version);
     /** @param tenantId 租户 ID。@param ticketId 工单 ID。@return 指定租户中的工单。 */
     Ticket getTicket(Long tenantId, Long ticketId);
     /** @param query 分页及筛选条件。@return 当前用户范围内的工单分页结果。 */

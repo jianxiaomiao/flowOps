@@ -67,6 +67,24 @@ public class TicketController {
     public Result<IPage<TicketResponse>> page(@Valid @ModelAttribute TicketPageQuery query) {
         return Result.success(ticketService.pageTickets(query).convert(TicketConverter::toResponse));
     }
+    @GetMapping("/external-queue")
+    @PreAuthorize("hasAuthority('ticket:claim') and hasAnyAuthority('ticket:read', 'ticket:read:department')")
+    public Result<IPage<TicketResponse>> externalQueue(
+            @RequestParam(defaultValue = "1") @Positive int pageNum,
+            @RequestParam(defaultValue = "10") @Positive @jakarta.validation.constraints.Max(50) int pageSize,
+            @RequestParam(defaultValue = "false") boolean mine) {
+        return Result.success(ticketService.pageExternalQueue(pageNum, pageSize, mine).convert(TicketConverter::toResponse));
+    }
+
+    @PostMapping("/{id}/claim")
+    @PreAuthorize("hasAuthority('ticket:claim') and hasAnyAuthority('ticket:read', 'ticket:read:department')")
+    public Result<TicketResponse> claim(@PathVariable @Positive Long id, @Valid @RequestBody ClaimRequest request) {
+        return Result.success(TicketConverter.toResponse(ticketService.claimExternalTicket(id, request.version())));
+    }
+
+    public record ClaimRequest(@jakarta.validation.constraints.NotNull
+                               @jakarta.validation.constraints.PositiveOrZero Integer version) {}
+
     /**
      * 将工单分派或重新分派给目标部门和可选处理人。
      *

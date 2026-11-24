@@ -31,6 +31,7 @@ public class Ticket {
 
     private Long handlingDepartmentId;
 
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long currentAssigneeId;
 
     private LocalDateTime firstResponseAt;
