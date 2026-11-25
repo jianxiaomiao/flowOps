@@ -203,6 +203,7 @@ npm run build
 - [代码阅读路线](docs/05-code-reading-roadmap.md)
 - [HTTP API 契约](docs/06-api-contract.md)
 - [前端 API 接入清单](docs/09-frontend-api-integration.md)
+- [Nexus 工单接入验收](docs/17-nexus-ticket-acceptance.md)
 - [Redis 接入计划](docs/10-redis-integration-plan.md)
 - [Playwright 与 Flyway 验证](docs/11-playwright-flyway-verification.md)
 - [Docker 与配置分层指南](docs/12-docker-configuration-guide.md)

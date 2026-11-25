@@ -2,7 +2,13 @@ package com.example.demo.service.impl;
 
 import com.example.demo.common.BusinessException;
 import com.example.demo.dto.ticket.TicketTransitionRequest;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import com.example.demo.entity.Ticket;
+import com.example.demo.entity.TicketAssignment;
+import com.example.demo.mapper.TicketMapper;
 import com.example.demo.entity.TicketTransition;
 import com.example.demo.entity.UserAccount;
 import com.example.demo.mapper.TicketAssignmentMapper;
@@ -16,6 +22,7 @@ import com.example.demo.validator.TenantScopeValidator;
 import com.example.demo.security.TenantContext;
 import com.example.demo.messaging.OutboxEventService;
 import com.example.demo.security.TicketReadScope;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +30,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 
@@ -31,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
@@ -51,6 +60,7 @@ class TicketServiceImplTest {
     @Mock private UserAccountService userAccountService;
     @Mock private SlaPolicyService slaPolicyService;
     @Mock private TicketNumberGenerator ticketNumberGenerator;
+    @Mock private TicketMapper ticketMapper;
     @Mock private TicketTransitionMapper transitionMapper;
     @Mock private TicketAssignmentMapper assignmentMapper;
     @Mock private TicketCommentMapper commentMapper;
@@ -59,6 +69,13 @@ class TicketServiceImplTest {
     @Mock private TicketReadScope ticketReadScope;
 
     private TicketServiceImpl ticketService;
+
+    @BeforeAll
+    static void registerTicketMapperMetadata() {
+        var assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "ticket-unit-test");
+        assistant.setCurrentNamespace(TicketMapper.class.getName());
+        TableInfoHelper.initTableInfo(assistant, Ticket.class);
+    }
 
     @BeforeEach
     void setUp() {
@@ -74,6 +91,7 @@ class TicketServiceImplTest {
                 outboxEventService,
                 ticketReadScope
         ));
+        ReflectionTestUtils.setField(ticketService, "baseMapper", ticketMapper);
         when(tenantContext.tenantId()).thenReturn(TENANT_ID);
     }
 
@@ -198,6 +216,58 @@ class TicketServiceImplTest {
         assertEquals("REJECT", captor.getValue().getAction());
         assertEquals(TicketStatus.PENDING_CONFIRMATION.name(), captor.getValue().getFromStatus());
         assertEquals(TicketStatus.PROCESSING.name(), captor.getValue().getToStatus());
+    }
+
+    @Test
+    void claimAssignsOnlyTheCurrentOperatorAndRecordsResponse() {
+        Ticket ticket = claimableTicket(33L);
+        when(ticketMapper.isExternal(TENANT_ID, TICKET_ID)).thenReturn(true);
+        when(ticketMapper.update(isNull(), any(Wrapper.class))).thenReturn(1);
+        Ticket claimed = ticketService.claimExternalTicket(TICKET_ID, 0);
+
+        assertEquals(ASSIGNEE_ID, claimed.getCurrentAssigneeId());
+        assertEquals("ACCEPTED", claimed.getStatus());
+        assertEquals(1, claimed.getVersion());
+        assertNotNull(claimed.getFirstResponseAt());
+        verify(assignmentMapper).insert(any(TicketAssignment.class));
+        var transition = ArgumentCaptor.forClass(TicketTransition.class);
+        verify(transitionMapper).insert(transition.capture());
+        assertEquals("CLAIM", transition.getValue().getAction());
+    }
+
+    @Test
+    void losingVersionRaceDoesNotRecordHistoryOrResponse() {
+        Ticket ticket = claimableTicket(33L);
+        when(ticketMapper.isExternal(TENANT_ID, TICKET_ID)).thenReturn(true);
+        when(ticketMapper.update(isNull(), any(Wrapper.class))).thenReturn(0);
+        var conflict = assertThrows(BusinessException.class, () -> ticketService.claimExternalTicket(TICKET_ID, 0));
+
+        assertEquals(30002, conflict.getCode());
+        assertEquals("ASSIGNED", ticket.getStatus());
+        assertEquals("PENDING", ticket.getResponseSlaStatus());
+        verify(transitionMapper, never()).insert(any(TicketTransition.class));
+        verify(assignmentMapper, never()).insert(any(TicketAssignment.class));
+    }
+
+    @Test
+    void rejectsClaimFromOtherDepartmentBeforeUpdating() {
+        claimableTicket(34L);
+        var rejected = assertThrows(BusinessException.class, () -> ticketService.claimExternalTicket(TICKET_ID, 0));
+        assertEquals(20001, rejected.getCode());
+        verify(ticketMapper, never()).update(isNull(), any(Wrapper.class));
+    }
+
+    private Ticket claimableTicket(long handlingDepartment) {
+        UserAccount actor = activeUser(ASSIGNEE_ID);
+        actor.setDepartmentId(33L);
+        when(tenantContext.userId()).thenReturn(ASSIGNEE_ID);
+        when(userAccountService.getUser(TENANT_ID, ASSIGNEE_ID)).thenReturn(actor);
+        when(ticketMapper.canClaim(TENANT_ID, ASSIGNEE_ID)).thenReturn(true);
+        Ticket ticket = ticket(TicketStatus.ASSIGNED, 0);
+        ticket.setCurrentAssigneeId(null);
+        ticket.setHandlingDepartmentId(handlingDepartment);
+        stubTicket(ticket);
+        return ticket;
     }
 
     private void stubTicket(Ticket ticket) {

@@ -7,7 +7,7 @@ import { fetchDepartments, fetchUserPage } from '@/services/organization'
 import {
   addTicketComment, assignTicket, createTicket, fetchTicket, fetchTicketAssignments,
   fetchTicketComments, fetchTicketKnowledgeArticles, fetchTicketPage, fetchTicketTransitions, transitionTicket,
-  fetchTicketRecommendations, submitRecommendationFeedback,
+  fetchTicketRecommendations, submitRecommendationFeedback, fetchExternalQueue, claimExternalTicket,
 } from '@/services/ticket'
 import { fetchKnowledgePage, linkKnowledgeArticleToTicket } from '@/services/knowledge'
 import { ApiError } from '@/services/http'
@@ -17,6 +17,11 @@ type RecommendationState = 'idle' | 'loading' | 'success' | 'empty' | 'error'
 
 const auth = useAuthStore()
 const tickets = ref<TicketPreview[]>([])
+const queue = ref<'all' | 'unclaimed' | 'mine'>('all')
+const claiming = ref<number | null>(null)
+let listRequest = 0
+const canClaim = computed(() => auth.hasAuthority('ticket:claim') &&
+  (auth.hasAuthority('ticket:read:department') || auth.hasAuthority('ticket:read')))
 const departments = ref<Department[]>([])
 const users = ref<UserAccount[]>([])
 const total = ref(0)
@@ -53,15 +58,55 @@ const statusLabels: Record<TicketStatus, string> = { OPEN: '待分派', ASSIGNED
 const actionLabels: Record<TicketAction, string> = { ACCEPT: '接单', START_PROCESS: '开始处理', SUBMIT_RESOLUTION: '提交方案', CONFIRM: '确认解决', REJECT: '驳回方案', CLOSE: '关闭工单' }
 const actionByStatus: Partial<Record<TicketStatus, TicketAction[]>> = { ASSIGNED: ['ACCEPT'], ACCEPTED: ['START_PROCESS'], PROCESSING: ['SUBMIT_RESOLUTION'], PENDING_CONFIRMATION: ['CONFIRM', 'REJECT'], RESOLVED: ['CLOSE'] }
 const actionAuthority: Record<TicketAction, string> = { ACCEPT: 'ticket:accept', START_PROCESS: 'ticket:update', SUBMIT_RESOLUTION: 'ticket:resolve', CONFIRM: 'ticket:confirm', REJECT: 'ticket:confirm', CLOSE: 'ticket:confirm' }
-const availableActions = computed(() => selected.value ? (actionByStatus[selected.value.status] ?? []).filter((action) => auth.hasAuthority(actionAuthority[action])) : [])
+const availableActions = computed(() => selected.value ? (actionByStatus[selected.value.status] ?? []).filter((action) => auth.hasAuthority(actionAuthority[action]) &&
+  (action !== 'ACCEPT' || selected.value?.currentAssigneeId === auth.userId)) : [])
 const canUseKnowledgeRecommendations = computed(() => auth.hasAuthority('knowledge:read') || auth.hasAuthority('knowledge:write') || auth.hasAuthority('knowledge:manage'))
 
 async function loadTickets() {
+  const request = ++listRequest
   loading.value = true
   try {
-    const page = await fetchTicketPage({ pageNum: pageNum.value, pageSize: pageSize.value, title: keyword.value || undefined, status: status.value || undefined, priority: priority.value || undefined })
-    tickets.value = page.records; total.value = page.total
-  } finally { loading.value = false }
+    const page = queue.value === 'all'
+      ? await fetchTicketPage({ pageNum: pageNum.value, pageSize: pageSize.value, title: keyword.value || undefined, status: status.value || undefined, priority: priority.value || undefined })
+      : await fetchExternalQueue(pageNum.value, pageSize.value, queue.value === 'mine')
+    if (request !== listRequest) return
+    const lastPage = Math.max(1, Math.ceil(page.total / pageSize.value))
+    if (pageNum.value > lastPage && page.records.length === 0) {
+      pageNum.value = lastPage
+      await loadTickets()
+      return
+    }
+    tickets.value = page.records
+    total.value = page.total
+  } finally {
+    if (request === listRequest) loading.value = false
+  }
+}
+
+async function selectQueue(next: typeof queue.value) {
+  queue.value = next
+  pageNum.value = 1
+  tickets.value = []
+  total.value = 0
+  await loadTickets()
+}
+
+async function claim(id: number, version: number) {
+  if (claiming.value !== null) return
+  claiming.value = id
+  try {
+    await claimExternalTicket(id, version)
+    ElMessage.success('领取成功')
+  } catch (error) {
+    if (error instanceof ApiError && error.httpStatus === 409) {
+      ElMessage.warning('工单已变化，正在刷新队列')
+    } else {
+      ElMessage.error(error instanceof ApiError ? error.message : '领取结果暂时无法确认')
+    }
+  } finally {
+    claiming.value = null
+    await loadTickets()
+  }
 }
 
 async function loadOptions() {
@@ -176,7 +221,15 @@ onMounted(async () => { await Promise.all([loadTickets(), loadOptions()]) })
       <el-button v-if="auth.hasAuthority('ticket:create')" class="primary-action" type="primary" :icon="Plus" @click="createVisible = true">创建工单</el-button>
     </header>
     <section class="glass-card module-card">
-      <form class="ticket-toolbar" @submit.prevent="loadTickets">
+      <el-button-group v-if="canClaim">
+        <el-button :type="queue === 'all' ? 'primary' : 'default'" @click="selectQueue('all')">全部工单</el-button>
+        <el-button :type="queue === 'unclaimed' ? 'primary' : 'default'" @click="selectQueue('unclaimed')">待领取</el-button>
+        <el-button :type="queue === 'mine' ? 'primary' : 'default'" @click="selectQueue('mine')">我负责的外部工单</el-button>
+      </el-button-group>
+      <div v-if="queue !== 'all'" class="ticket-toolbar">
+        <el-button :loading="loading" @click="loadTickets">刷新队列</el-button>
+      </div>
+      <form v-else class="ticket-toolbar" @submit.prevent="loadTickets">
         <el-input v-model="keyword" class="ticket-search" placeholder="搜索标题" :prefix-icon="Search" clearable />
         <el-select v-model="status" placeholder="全部状态" clearable><el-option v-for="(label, value) in statusLabels" :key="value" :label="label" :value="value" /></el-select>
         <el-select v-model="priority" placeholder="全部优先级" clearable><el-option v-for="item in ['P0','P1','P2']" :key="item" :label="item" :value="item" /></el-select>
@@ -186,6 +239,12 @@ onMounted(async () => { await Promise.all([loadTickets(), loadOptions()]) })
         <el-table-column prop="ticketNo" label="工单号" width="170" /><el-table-column prop="title" label="标题" min-width="220" />
         <el-table-column prop="priority" label="优先级" width="90" /><el-table-column label="状态" width="110"><template #default="scope">{{ statusLabels[scope.row.status as TicketStatus] }}</template></el-table-column>
         <el-table-column prop="currentAssigneeId" label="处理人 ID" width="110" /><el-table-column prop="updatedAt" label="更新时间" width="170" />
+        <el-table-column v-if="queue === 'unclaimed'" label="操作" width="110">
+          <template #default="scope">
+            <el-button type="primary" :loading="claiming === scope.row.id" :disabled="claiming !== null"
+              @click.stop="claim(scope.row.id, scope.row.version)">领取</el-button>
+          </template>
+        </el-table-column>
       </el-table>
       <div class="table-footer"><span>共 {{ total }} 张</span><el-pagination background layout="prev,pager,next" :total="total" :page-size="pageSize" v-model:current-page="pageNum" @current-change="loadTickets" /></div>
     </section>

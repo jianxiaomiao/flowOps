@@ -25,6 +25,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 /** 工单用例编排：修改当前快照时，同一事务写入不可变历史。 */
@@ -65,11 +66,22 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
      * @throws BusinessException 当租户、处理部门、创建人状态、SLA 策略或工单类型不合法时抛出。
      */
     public Ticket createTicket(TicketCreateRequest request) {
-        Long tenantId = tenantContext.tenantId();
-        Long operatorId = tenantContext.userId();
+        return createTicket(tenantContext.tenantId(), tenantContext.userId(), request, false);
+    }
+
+    @Override
+    @Transactional
+    public Ticket createExternalTicket(Long tenantId, Long actorId, TicketCreateRequest request) {
+        return createTicket(tenantId, actorId, request, true);
+    }
+
+    private Ticket createTicket(Long tenantId, Long operatorId, TicketCreateRequest request, boolean external) {
         tenantScopeValidator.requireActiveTenant(tenantId);
         UserAccount creator = userAccountService.getUser(tenantId, operatorId);
         if (!ACTIVE.equals(creator.getStatus())) throw new BusinessException(30001, "已停用用户不能创建工单");
+        if (external && !"MACHINE".equals(creator.getAccountKind())) {
+            throw new BusinessException(30016, "接入配置需要启用的工单技术账号");
+        }
         tenantScopeValidator.requireActiveDepartment(tenantId, request.getHandlingDepartmentId());
         SlaPolicy policy = slaPolicyService.getEnabledPolicy(tenantId, request.getPriority());
         Ticket ticket = TicketConverter.toEntity(request);
@@ -82,7 +94,13 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
         ticket.setResponseSlaStatus("PENDING"); ticket.setResolutionSlaStatus("PENDING"); ticket.setUpdatedBy(creator.getId());
         if (!save(ticket)) throw new IllegalStateException("创建工单失败");
         writeTransition(ticket, TicketAction.CREATE, "NONE", creator.getId(), "创建工单");
-        outboxEventService.enqueueTicketEvent(ticket, "TICKET_CREATED", List.of(creator.getId()));
+        if (external) {
+            ticket.setStatus(TicketStatus.ASSIGNED.name());
+            updateTicket(ticket);
+            recordAssignment(ticket, ticket.getHandlingDepartmentId(), null, operatorId, "自动分派到接入部门", "ASSIGN");
+            writeTransition(ticket, TicketAction.ASSIGN, TicketStatus.OPEN.name(), operatorId, "自动分派到接入部门");
+        }
+        outboxEventService.enqueueTicketEvent(ticket, "TICKET_CREATED", external ? List.of() : List.of(creator.getId()));
         return ticket;
     }
 
@@ -144,11 +162,12 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
 
         if (!(TicketStatus.OPEN.name().equals(ticket.getStatus()) || TicketStatus.ASSIGNED.name().equals(ticket.getStatus()))) throw new BusinessException(30001, "当前状态不能分派工单");
         
-        UserAccount assignee = null;
-
         if (request.getToAssigneeId() != null) {
-            assignee = userAccountService.getUser(tenantId, request.getToAssigneeId());
-            if (!ACTIVE.equals(assignee.getStatus()) || !request.getToDepartmentId().equals(assignee.getDepartmentId())) throw new BusinessException(30001, "处理人必须是目标部门中的启用用户");
+            UserAccount assignee = userAccountService.getUser(tenantId, request.getToAssigneeId());
+            if (!ACTIVE.equals(assignee.getStatus()) || "MACHINE".equals(assignee.getAccountKind())
+                    || !request.getToDepartmentId().equals(assignee.getDepartmentId())) {
+                throw new BusinessException(30001, "处理人必须是目标部门中的启用人工账号");
+            }
         }
 
         String fromStatus = ticket.getStatus();
@@ -167,38 +186,104 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
 
         updateTicket(ticket);
 
-        TicketAssignment assignment = new TicketAssignment();
-
-        assignment.setTenantId(ticket.getTenantId());
-        
-        assignment.setTicketId(ticket.getId());
-
-        assignment.setAssignmentType(fromAssigneeId == null ? "ASSIGN" : "REASSIGN");
-        
-        assignment.setFromDepartmentId(fromDepartmentId);
-        
-        assignment.setToDepartmentId(request.getToDepartmentId());
-
-        assignment.setFromAssigneeId(fromAssigneeId); 
-        
-        assignment.setToAssigneeId(request.getToAssigneeId()); 
-        
-        assignment.setAssignedBy(operatorId); 
-        
-        assignment.setReason(request.getReason()); 
-        
-        assignment.setTicketVersion(ticket.getVersion()); 
-        
-        assignment.setCreatedAt(LocalDateTime.now());
-
-        assignmentMapper.insert(assignment);
-        if (!fromStatus.equals(ticket.getStatus()))
-        writeTransition(ticket, TicketAction.ASSIGN, fromStatus, operatorId, request.getReason());
+        recordAssignment(ticket, fromDepartmentId, fromAssigneeId, operatorId, request.getReason(),
+                fromAssigneeId == null ? "ASSIGN" : "REASSIGN");
+        if (!fromStatus.equals(ticket.getStatus())) {
+            writeTransition(ticket, TicketAction.ASSIGN, fromStatus, operatorId, request.getReason());
+        }
 
         outboxEventService.enqueueTicketEvent(ticket, "TICKET_ASSIGNED",
                 List.of(request.getToAssigneeId() == null ? ticket.getCreatorId() : request.getToAssigneeId()));
 
         return ticket;
+    }
+
+    private void recordAssignment(Ticket ticket, Long fromDepartmentId, Long fromAssigneeId, Long actorId,
+                                  String reason, String assignmentType) {
+        var assignment = new TicketAssignment();
+        assignment.setTenantId(ticket.getTenantId());
+        assignment.setTicketId(ticket.getId());
+        assignment.setAssignmentType(assignmentType);
+        assignment.setFromDepartmentId(fromDepartmentId);
+        assignment.setToDepartmentId(ticket.getHandlingDepartmentId());
+        assignment.setFromAssigneeId(fromAssigneeId);
+        assignment.setToAssigneeId(ticket.getCurrentAssigneeId());
+        assignment.setAssignedBy(actorId);
+        assignment.setReason(reason);
+        assignment.setTicketVersion(ticket.getVersion());
+        assignment.setCreatedAt(LocalDateTime.now());
+        assignmentMapper.insert(assignment);
+    }
+
+    @Override
+    public Page<Ticket> pageExternalQueue(int pageNum, int pageSize, boolean mine) {
+        Long tenantId = tenantContext.tenantId();
+        Long actorId = tenantContext.userId();
+        Long department = claimDepartment(tenantId, actorId);
+        var query = Wrappers.lambdaQuery(Ticket.class)
+                .eq(Ticket::getTenantId, tenantId)
+                .eq(Ticket::getHandlingDepartmentId, department)
+                .exists("SELECT 1 FROM external_ticket_link l WHERE l.tenant_id = ticket.tenant_id AND l.ticket_id = ticket.id");
+        if (mine) {
+            query.eq(Ticket::getCurrentAssigneeId, actorId);
+        } else {
+            query.eq(Ticket::getStatus, TicketStatus.ASSIGNED.name()).isNull(Ticket::getCurrentAssigneeId);
+        }
+        return page(new Page<>(pageNum, pageSize), query.orderByDesc(Ticket::getUpdatedAt, Ticket::getId));
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation(module = "TICKET", operation = "CLAIM", resourceType = "TICKET")
+    public Ticket claimExternalTicket(Long ticketId, Integer version) {
+        Long tenantId = tenantContext.tenantId();
+        Long actorId = tenantContext.userId();
+        Long department = claimDepartment(tenantId, actorId);
+        Ticket ticket = getTicket(tenantId, ticketId);
+        if (!department.equals(ticket.getHandlingDepartmentId()) || !baseMapper.isExternal(tenantId, ticketId)) {
+            throw new BusinessException(20001, "工单不在可领取范围");
+        }
+
+        assertVersion(ticket, version);
+        if (!TicketStatus.ASSIGNED.name().equals(ticket.getStatus()) || ticket.getCurrentAssigneeId() != null) {
+            throw new BusinessException(30002, "工单已被处理，请刷新");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        boolean responseLate = now.isAfter(ticket.getResponseDueAt());
+        LocalDateTime responseBreachedAt = responseLate
+                ? Objects.requireNonNullElse(ticket.getResponseBreachedAt(), now) : null;
+        int updated = baseMapper.update(null, Wrappers.lambdaUpdate(Ticket.class)
+                .eq(Ticket::getTenantId, tenantId).eq(Ticket::getId, ticketId)
+                .eq(Ticket::getHandlingDepartmentId, department).eq(Ticket::getVersion, version)
+                .eq(Ticket::getStatus, TicketStatus.ASSIGNED.name()).isNull(Ticket::getCurrentAssigneeId)
+                .set(Ticket::getStatus, TicketStatus.ACCEPTED.name()).set(Ticket::getCurrentAssigneeId, actorId)
+                .set(Ticket::getFirstResponseAt, now).set(Ticket::getResponseSlaStatus, responseLate ? "BREACHED" : "MET")
+                .set(Ticket::getResponseBreachedAt, responseBreachedAt)
+                .set(Ticket::getUpdatedAt, now).set(Ticket::getUpdatedBy, actorId).setSql("version = version + 1"));
+        if (updated != 1) throw new BusinessException(30002, "工单已被其他操作修改，请刷新后重试");
+
+        ticket.setStatus(TicketStatus.ACCEPTED.name());
+        ticket.setCurrentAssigneeId(actorId);
+        ticket.setFirstResponseAt(now);
+        ticket.setResponseSlaStatus(responseLate ? "BREACHED" : "MET");
+        ticket.setResponseBreachedAt(responseBreachedAt);
+        ticket.setUpdatedAt(now);
+        ticket.setUpdatedBy(actorId);
+        ticket.setVersion(version + 1);
+        recordAssignment(ticket, department, null, actorId, "客服主动领取", "CLAIM");
+        writeTransition(ticket, TicketAction.CLAIM, TicketStatus.ASSIGNED.name(), actorId, null);
+        outboxEventService.enqueueTicketEvent(ticket, "TICKET_STATUS_CHANGED", List.of(actorId));
+        return ticket;
+    }
+
+    private Long claimDepartment(Long tenantId, Long actorId) {
+        UserAccount actor = userAccountService.getUser(tenantId, actorId);
+        if (!ACTIVE.equals(actor.getStatus()) || "MACHINE".equals(actor.getAccountKind())
+                || !baseMapper.canClaim(tenantId, actorId)) {
+            throw new BusinessException(10003, "没有执行该操作的权限");
+        }
+        tenantScopeValidator.requireActiveDepartment(tenantId, actor.getDepartmentId());
+        return actor.getDepartmentId();
     }
 
     @Override @Transactional
@@ -234,7 +319,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
             case CONFIRM -> { requireStatus(ticket, TicketStatus.PENDING_CONFIRMATION); requireCreator(ticket, operatorId); ticket.setStatus(TicketStatus.RESOLVED.name()); ticket.setResolvedAt(now); markResolutionSla(ticket, now); }
             case REJECT -> { requireStatus(ticket, TicketStatus.PENDING_CONFIRMATION); requireCreator(ticket, operatorId); ticket.setStatus(TicketStatus.PROCESSING.name()); }
             case CLOSE -> { requireStatus(ticket, TicketStatus.RESOLVED); requireCreator(ticket, operatorId); ticket.setStatus(TicketStatus.CLOSED.name()); ticket.setClosedAt(now); }
-            case CREATE, ASSIGN -> throw new BusinessException(10001, "该动作不能通过状态流转接口执行");
+            case CREATE, ASSIGN, CLAIM -> throw new BusinessException(10001, "该动作不能通过状态流转接口执行");
         }
         ticket.setUpdatedBy(operatorId); updateTicket(ticket); writeTransition(ticket, action, fromStatus, operatorId, request.getRemark());
         outboxEventService.enqueueTicketEvent(ticket, "TICKET_STATUS_CHANGED",

@@ -60,7 +60,7 @@ public class AuthServiceImpl implements AuthService {
         UserAccount user = userAccountMapper.selectOne(Wrappers.lambdaQuery(UserAccount.class)
                 .eq(UserAccount::getTenantId, tenant.getId())
                 .eq(UserAccount::getUsername, username));
-        if (user == null || !"ACTIVE".equals(user.getStatus())
+        if (user == null || !"ACTIVE".equals(user.getStatus()) || "MACHINE".equals(user.getAccountKind())
                 || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw invalidCredentials();
         }

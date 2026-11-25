@@ -32,6 +32,8 @@ public class UserAccount {
     /** ACTIVE、LOCKED、DISABLED。 */
     private String status;
 
+    private String accountKind;
+
     /** 仅在认证成功后更新。 */
     private LocalDateTime lastLoginAt;
 

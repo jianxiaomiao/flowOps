@@ -1,5 +1,7 @@
 package com.example.demo.service.impl;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.demo.common.BusinessException;
 import com.example.demo.config.JwtProperties;
 import com.example.demo.dto.auth.LoginRequest;
@@ -9,6 +11,8 @@ import com.example.demo.mapper.RolePermissionMapper;
 import com.example.demo.mapper.TenantMapper;
 import com.example.demo.mapper.UserAccountMapper;
 import com.example.demo.security.TokenSessionService;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,6 +37,13 @@ class AuthServiceImplTest {
     @Mock PasswordEncoder passwordEncoder;
     @Mock JwtEncoder jwtEncoder;
     @Mock TokenSessionService tokenSessionService;
+
+    @BeforeAll
+    static void registerUserAccountMapperMetadata() {
+        var assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "auth-unit-test");
+        assistant.setCurrentNamespace(UserAccountMapper.class.getName());
+        TableInfoHelper.initTableInfo(assistant, UserAccount.class);
+    }
 
     @Test
     void shouldIssueTokenWithTrustedIdentityAndAuthorities() {
@@ -96,6 +107,21 @@ class AuthServiceImplTest {
 
         assertEquals(10002, error.getCode());
         verifyNoInteractions(passwordEncoder, rolePermissionMapper, jwtEncoder);
+        verify(userAccountMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void shouldRejectMachineAccountWithoutCheckingPassword() {
+        UserAccount machine = activeUser();
+        machine.setAccountKind("MACHINE");
+        when(tenantMapper.selectOne(any())).thenReturn(activeTenant());
+        when(userAccountMapper.selectOne(any())).thenReturn(machine);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service().login(new LoginRequest("ACME", "xiaomiao", "password123")));
+
+        assertEquals(10002, error.getCode());
+        verifyNoInteractions(passwordEncoder, rolePermissionMapper, jwtEncoder, tokenSessionService);
         verify(userAccountMapper, never()).update(any(), any());
     }
 

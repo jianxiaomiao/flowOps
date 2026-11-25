@@ -67,3 +67,15 @@ export async function submitRecommendationFeedback(id: number, articleId: number
   const response = await http.post<ApiResult<void>>(`/ticket/${id}/recommendations/${articleId}/feedback`, payload)
   return response.data
 }
+
+export async function fetchExternalQueue(pageNum: number, pageSize: number, mine: boolean) {
+  const response = await http.get<ApiResult<PageResult<TicketPreview>>>('/ticket/external-queue', {
+    params: { pageNum, pageSize, mine },
+  })
+  return response.data.data
+}
+
+export async function claimExternalTicket(id: number, version: number) {
+  const response = await http.post<ApiResult<TicketPreview>>(`/ticket/${id}/claim`, { version })
+  return response.data.data
+}
