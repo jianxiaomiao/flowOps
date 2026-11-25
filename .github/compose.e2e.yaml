@@ -1,0 +1,9 @@
+services:
+  milvus:
+    environment:
+      # The ephemeral browser stack uses Milvus local storage and its existing etcd.
+      COMMON_STORAGETYPE: local
+      MINIO_ADDRESS: !reset null
+    depends_on: !override
+      etcd:
+        condition: service_healthy

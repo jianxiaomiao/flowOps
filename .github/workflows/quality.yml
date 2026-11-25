@@ -105,6 +105,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend, frontend]
     env:
+      COMPOSE_FILE: compose.yaml:.github/compose.e2e.yaml
+      COMPOSE_PROJECT_NAME: flowops-e2e
       FLOWOPS_DB_PASSWORD: flowops-ci-db-password
       FLOWOPS_DB_ROOT_PASSWORD: flowops-ci-root-password
       FLOWOPS_REDIS_PASSWORD: flowops-ci-redis-password
@@ -125,7 +127,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Build and start the application stack
-        run: docker compose --parallel 1 up --build -d
+        run: docker compose --parallel 1 up --build -d frontend
       - name: Wait for backend startup
         shell: bash
         run: |
@@ -167,3 +169,4 @@ jobs:
       - name: Stop isolated application stack
         if: always()
         run: docker compose down -v
+

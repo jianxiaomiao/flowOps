@@ -1,8 +1,12 @@
 package com.example.demo.sla;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.demo.entity.Ticket;
 import com.example.demo.mapper.TicketMapper;
 import com.example.demo.messaging.OutboxEventService;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -15,6 +19,13 @@ import static org.mockito.Mockito.*;
 class SlaBreachProcessorTest {
     @Mock TicketMapper ticketMapper;
     @Mock OutboxEventService outboxEventService;
+
+    @BeforeAll
+    static void registerTicketMapperMetadata() {
+        var assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "sla-breach-unit-test");
+        assistant.setCurrentNamespace(TicketMapper.class.getName());
+        TableInfoHelper.initTableInfo(assistant, Ticket.class);
+    }
 
     @Test
     void duplicateScansShouldOnlyCreateOneOutboxEvent() {
