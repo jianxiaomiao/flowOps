@@ -3,14 +3,19 @@ package com.example.demo.controller;
 import com.example.demo.common.BusinessException;
 import com.example.demo.common.Result;
 import com.example.demo.dto.auth.LoginRequest;
+import com.example.demo.dto.auth.SendEmailCodeRequest;
 import com.example.demo.dto.auth.TenantRegistrationRequest;
 import com.example.demo.security.AuthenticationRateLimiter;
+import com.example.demo.security.CaptchaService;
 import com.example.demo.security.CurrentUser;
 import com.example.demo.security.CurrentUserProvider;
 import com.example.demo.security.TokenSessionService;
 import com.example.demo.service.AuthService;
+import com.example.demo.service.EmailVerificationService;
 import com.example.demo.service.OnboardingService;
+import com.example.demo.vo.CaptchaResponse;
 import com.example.demo.vo.CurrentUserResponse;
+import com.example.demo.vo.EmailCodeSendResponse;
 import com.example.demo.vo.LoginResponse;
 import com.example.demo.vo.TenantRegistrationResponse;
 import jakarta.validation.Valid;
@@ -31,6 +36,8 @@ public class AuthController {
     private final OnboardingService onboardingService;
     private final AuthenticationRateLimiter authenticationRateLimiter;
     private final TokenSessionService tokenSessionService;
+    private final CaptchaService captchaService;
+    private final EmailVerificationService emailVerificationService;
 
     /**
      * 使用租户编码、用户名和密码创建 JWT。
@@ -53,6 +60,19 @@ public class AuthController {
             }
             throw exception;
         }
+    }
+
+    /** 获取图形算术验证码，用于前置校验发送邮箱验证码。 */
+    @GetMapping("/captcha")
+    public Result<CaptchaResponse> captcha() {
+        return Result.success(captchaService.generate());
+    }
+
+    /** 校验图形验证码并发送注册邮箱验证码。 */
+    @PostMapping("/email-codes")
+    public Result<EmailCodeSendResponse> sendEmailCode(@Valid @RequestBody SendEmailCodeRequest request,
+                                                       HttpServletRequest servletRequest) {
+        return Result.success(emailVerificationService.sendRegistrationCode(request, servletRequest.getRemoteAddr()));
     }
 
     /** 创建新企业、默认部门和首位管理员。 */

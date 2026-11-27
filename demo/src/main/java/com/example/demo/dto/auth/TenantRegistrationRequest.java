@@ -13,6 +13,16 @@ public record TenantRegistrationRequest(
         @NotBlank @Size(min = 8, max = 72) String adminPassword,
         @NotBlank @Size(max = 64) String adminDisplayName,
         @Email @Size(max = 128) String adminEmail,
-        @Size(max = 32) String adminPhone
+        @Size(max = 32) String adminPhone,
+        @Size(max = 16) String emailCode
 ) {
+    public TenantRegistrationRequest(String tenantCode,
+                                     String tenantName,
+                                     String adminUsername,
+                                     String adminPassword,
+                                     String adminDisplayName,
+                                     String adminEmail,
+                                     String adminPhone) {
+        this(tenantCode, tenantName, adminUsername, adminPassword, adminDisplayName, adminEmail, adminPhone, null);
+    }
 }

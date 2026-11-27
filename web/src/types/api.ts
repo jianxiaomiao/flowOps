@@ -23,14 +23,32 @@ export interface CurrentUserResponse {
   authorities: string[]
 }
 
+export interface CaptchaResponse {
+  captchaId: string
+  imageDataUrl: string
+  expiresInSeconds: number
+}
+
+export interface SendEmailCodeRequest {
+  email: string
+  captchaId: string
+  captchaAnswer: string
+}
+
+export interface EmailCodeSendResponse {
+  cooldownSeconds: number
+  expiresInSeconds: number
+}
+
 export interface TenantRegistrationRequest {
   tenantCode: string
   tenantName: string
   adminUsername: string
   adminPassword: string
   adminDisplayName: string
-  adminEmail?: string
+  adminEmail: string
   adminPhone?: string
+  emailCode: string
 }
 
 export interface TenantRegistrationResponse {

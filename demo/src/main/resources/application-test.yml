@@ -21,6 +21,8 @@ flowops:
     enabled: ${FLOWOPS_TEST_MESSAGING_ENABLED:false}
   sla:
     enabled: false
+  registration:
+    email-verification-enabled: false
   security:
     jwt:
       secret: ${FLOWOPS_TEST_JWT_SECRET}

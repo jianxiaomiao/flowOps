@@ -61,7 +61,7 @@ public class SecurityConfig {
                 //例如处理人已经登录，所以能通过这里；但他访问角色管理接口时，会在下一层 @PreAuthorize 被拒绝。
                 .authorizeHttpRequests(authorize -> authorize
                         // Prometheus 只能读取指标文本，健康端点也不返回依赖细节；生产环境仍应仅允许内部监控网络访问。
-                        .requestMatchers("/auth/login", "/auth/register", "/actuator/health", "/actuator/prometheus", "/error").permitAll()
+                        .requestMatchers("/auth/login", "/auth/register", "/auth/captcha", "/auth/email-codes", "/actuator/health", "/actuator/prometheus", "/error").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)

@@ -1,6 +1,21 @@
 spring:
   profiles:
     default: local
+  mail:
+    host: ${FLOWOPS_MAIL_HOST:smtp.qq.com}
+    port: ${FLOWOPS_MAIL_PORT:465}
+    username: ${FLOWOPS_MAIL_USERNAME:}
+    password: ${FLOWOPS_MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
   data:
     redis:
       host: ${FLOWOPS_REDIS_HOST:localhost}
@@ -92,6 +107,7 @@ flowops:
       secret: ${FLOWOPS_JWT_SECRET:}
   registration:
     enabled: ${FLOWOPS_REGISTRATION_ENABLED:true}
+    email-verification-enabled: ${FLOWOPS_REGISTRATION_EMAIL_VERIFICATION_ENABLED:true}
   messaging:
     enabled: ${FLOWOPS_MESSAGING_ENABLED:false}
     publish-batch-size: 100

@@ -3,6 +3,7 @@ import { ACCESS_TOKEN_KEY } from '@/constants/auth'
 import { useAuthStore } from '@/stores/auth'
 import { pinia } from '@/stores'
 
+const HomeView = () => import('@/views/HomeView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
 const RegisterView = () => import('@/views/RegisterView.vue')
 const AppLayout = () => import('@/layouts/AppLayout.vue')
@@ -10,6 +11,12 @@ const AppLayout = () => import('@/layouts/AppLayout.vue')
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: HomeView,
+      meta: { public: true, title: 'FlowOps' },
+    },
     {
       path: '/login',
       name: 'login',
@@ -26,7 +33,6 @@ const router = createRouter({
       path: '/',
       component: AppLayout,
       children: [
-        { path: '', redirect: '/tickets' },
         { path: 'tickets', name: 'tickets', component: () => import('@/views/TicketWorkspaceView.vue'), meta: { title: '工单中心' } },
         { path: 'notifications', name: 'notifications', component: () => import('@/views/NotificationView.vue'), meta: { title: '消息通知' } },
         { path: 'knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeBaseView.vue'), meta: { title: '知识库' } },
@@ -36,7 +42,7 @@ const router = createRouter({
         { path: 'tenants', name: 'tenants', component: () => import('@/views/TenantView.vue'), meta: { title: '租户管理', authority: 'platform:tenant:manage' } },
       ],
     },
-    { path: '/:pathMatch(.*)*', redirect: '/tickets' },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 

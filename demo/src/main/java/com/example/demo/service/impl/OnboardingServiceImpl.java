@@ -18,6 +18,7 @@ import com.example.demo.mapper.RolePermissionMapper;
 import com.example.demo.mapper.TenantMapper;
 import com.example.demo.mapper.UserAccountMapper;
 import com.example.demo.mapper.UserRoleMapper;
+import com.example.demo.service.EmailVerificationService;
 import com.example.demo.service.OnboardingService;
 import com.example.demo.vo.TenantRegistrationResponse;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class OnboardingServiceImpl implements OnboardingService {
     private final UserRoleMapper userRoleMapper;
     private final PasswordEncoder passwordEncoder;
     private final RegistrationProperties registrationProperties;
+    private final EmailVerificationService emailVerificationService;
 
     @Override
     @Transactional
@@ -58,6 +60,7 @@ public class OnboardingServiceImpl implements OnboardingService {
                 .eq(Tenant::getTenantCode, tenantCode)) > 0) {
             throw new BusinessException(30001, "企业编码已被使用");
         }
+        emailVerificationService.verifyAndConsumeRegistrationCode(request.adminEmail(), request.emailCode());
 
         Tenant tenant = new Tenant();
         tenant.setTenantCode(tenantCode);
