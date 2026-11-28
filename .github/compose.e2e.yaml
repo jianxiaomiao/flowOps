@@ -1,4 +1,8 @@
 services:
+  backend:
+    environment:
+      # Browser tests provision their tenant through the registration API without SMTP.
+      FLOWOPS_REGISTRATION_EMAIL_VERIFICATION_ENABLED: "false"
   milvus:
     environment:
       # The ephemeral browser stack uses Milvus local storage and its existing etcd.
